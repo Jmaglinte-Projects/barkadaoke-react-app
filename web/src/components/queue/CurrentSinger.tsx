@@ -19,7 +19,7 @@ export function CurrentSinger({
 }: CurrentSingerProps) {
   if (!song) {
     return (
-      <section className="hairline-card p-4 md:p-6">
+      <section className="hairline-card min-w-0 p-4 md:p-6">
         <p className="eyebrow-mono text-mute">Now singing</p>
         <p className="mt-2 text-body">Waiting for the first song…</p>
       </section>
@@ -27,10 +27,10 @@ export function CurrentSinger({
   }
 
   return (
-    <section className="hairline-card border-primary/40 p-4 md:p-6">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="size-2 animate-pulse rounded-full bg-primary" />
+    <section className="hairline-card min-w-0 border-primary/40 p-4 md:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" />
           <p className="eyebrow-mono text-primary">Now singing</p>
         </div>
         {onToggleBookmark ? (
@@ -38,21 +38,26 @@ export function CurrentSinger({
             saved={isSaved}
             disabled={bookmarkPending}
             onClick={onToggleBookmark}
+            className="shrink-0"
           />
         ) : null}
       </div>
-      <div className={`mt-3 flex items-center gap-3 ${compact ? '' : 'md:gap-4'}`}>
-        <Avatar size={compact ? 'default' : 'lg'}>
+      <div
+        className={`mt-3 flex items-start gap-3 ${compact ? '' : 'md:gap-4'}`}
+      >
+        <Avatar size={compact ? 'default' : 'lg'} className="shrink-0">
           <AvatarImage src={song.singerPhotoURL} alt={song.singerName} />
           <AvatarFallback>
             {song.singerName.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="min-w-0">
-          <p className="truncate font-semibold text-ink-strong">
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-semibold text-ink-strong">
             {song.singerName}
           </p>
-          <p className="truncate text-sm text-body">{song.title}</p>
+          <p className="mt-0.5 line-clamp-2 break-words text-sm text-body">
+            {song.title}
+          </p>
         </div>
       </div>
     </section>

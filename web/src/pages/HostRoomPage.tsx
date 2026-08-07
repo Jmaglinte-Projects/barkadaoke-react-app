@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { ListPlus } from 'lucide-react'
 import { toast } from 'sonner'
 
+import {
+  HostAddSongsFab,
+  HostAddSongsSheet,
+} from '@/components/host/HostAddSongsSheet'
 import { AppNav } from '@/components/layout/AppNav'
 import { HostControls } from '@/components/player/HostControls'
 import {
@@ -16,6 +21,7 @@ import { RoomHeader } from '@/components/room/RoomHeader'
 import { RoomQRCode } from '@/components/room/RoomQRCode'
 import { Button } from '@/components/ui/button'
 import {
+  addSongToQueue,
   advanceQueue,
   removeQueueItem,
   startFirstSong,
@@ -34,7 +40,7 @@ import {
   getUpcomingQueue,
   getVisibleQueue,
 } from '@/lib/queue'
-import type { PlaybackState } from '@/types/youtube'
+import type { PlaybackState, SongSearchResult } from '@/types/youtube'
 
 export function HostRoomPage() {
   const { roomId } = useParams()
@@ -44,6 +50,7 @@ export function HostRoomPage() {
   const playerRef = useRef<YouTubePlayerHandle>(null)
   const [showQr, setShowQr] = useState(true)
   const [isActing, setIsActing] = useState(false)
+  const [addSongsOpen, setAddSongsOpen] = useState(false)
 
   const { isJoining, error: joinError } = useEnsureRoomMembership(roomId, user)
   const { room, isLoading: roomLoading, error: roomError } = useRoom(roomId)
@@ -72,7 +79,34 @@ export function HostRoomPage() {
   const upcoming = useMemo(() => getUpcomingQueue(queue), [queue])
   const next = useMemo(() => getNextSong(queue), [queue])
   const visibleQueue = useMemo(() => getVisibleQueue(queue), [queue])
+  const myUpcomingCount = useMemo(
+    () => upcoming.filter((item) => item.singerUserId === user?.uid).length,
+    [upcoming, user?.uid],
+  )
   const isHost = Boolean(user && room && room.hostUserId === user.uid)
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (addSongsOpen) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key !== '/') return
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
+        return
+      }
+      event.preventDefault()
+      setAddSongsOpen(true)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [addSongsOpen])
 
   const isEndingRef = useRef(false)
   const isAdvancingRef = useRef(false)
@@ -171,14 +205,35 @@ export function HostRoomPage() {
 
   async function handleAdvance(mode: 'next' | 'skip') {
     if (!roomId || !room) return
+
+    const nextSong = getNextSong(queue)
+    const hasCurrent = Boolean(room.currentQueueItemId)
+
+    // Nothing to play or advance — stay on this page and tell the host.
+    if (!hasCurrent && !nextSong) {
+      toast.message('Queue is empty — add a song first')
+      return
+    }
+
     setIsActing(true)
     try {
-      if (!room.currentQueueItemId) {
+      if (!hasCurrent) {
         await startFirstSong(roomId, queue)
         toast.success('First song started')
+        return
+      }
+
+      await advanceQueue(roomId, queue, room.currentQueueItemId, mode)
+      if (nextSong) {
+        toast.success(
+          mode === 'skip'
+            ? `Skipped — up next: ${nextSong.singerName}`
+            : `Up next: ${nextSong.singerName}`,
+        )
       } else {
-        await advanceQueue(roomId, queue, room.currentQueueItemId, mode)
-        toast.success(mode === 'skip' ? 'Song skipped' : 'Next song ready')
+        toast.message(
+          mode === 'skip' ? 'Song skipped — queue finished' : 'Queue finished',
+        )
       }
     } catch (error) {
       toast.error(
@@ -186,6 +241,16 @@ export function HostRoomPage() {
       )
     } finally {
       setIsActing(false)
+    }
+  }
+
+  async function handleAddSong(result: SongSearchResult) {
+    if (!roomId || !user) return
+    try {
+      await addSongToQueue(roomId, user, result, queue)
+      toast.success('Song added to queue')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add song')
     }
   }
 
@@ -242,24 +307,6 @@ export function HostRoomPage() {
             onEnded={handleEnded}
           />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <CurrentSinger
-              song={current}
-              isSaved={current ? isSaved(current.youtubeVideoId) : false}
-              bookmarkPending={
-                current != null && pendingVideoId === current.youtubeVideoId
-              }
-              onToggleBookmark={
-                current
-                  ? () => {
-                      void toggleQueueItemBookmark(current)
-                    }
-                  : undefined
-              }
-            />
-            <NextSinger song={next} />
-          </div>
-
           <HostControls
             playbackState={room.playbackState}
             disabled={isActing}
@@ -291,12 +338,42 @@ export function HostRoomPage() {
             }}
           />
 
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <p className="eyebrow-mono text-mute">Queue</p>
-              <span className="font-mono text-sm text-body">
-                {upcoming.length} upcoming
-              </span>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+            <CurrentSinger
+              song={current}
+              isSaved={current ? isSaved(current.youtubeVideoId) : false}
+              bookmarkPending={
+                current != null && pendingVideoId === current.youtubeVideoId
+              }
+              onToggleBookmark={
+                current
+                  ? () => {
+                      void toggleQueueItemBookmark(current)
+                    }
+                  : undefined
+              }
+            />
+            <NextSinger song={next} />
+          </div>
+
+          <section className="pb-20">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="eyebrow-mono text-mute">Queue</p>
+                <p className="mt-1 font-mono text-sm text-body">
+                  {upcoming.length} upcoming
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="h-11"
+                onClick={() => setAddSongsOpen(true)}
+              >
+                <ListPlus data-icon="inline-start" />
+                Add songs
+              </Button>
             </div>
             <QueueList
               items={visibleQueue}
@@ -312,6 +389,19 @@ export function HostRoomPage() {
         </div>
 
         <aside className="min-w-0 space-y-4">
+          <Button
+            type="button"
+            size="lg"
+            className="hidden h-12 w-full text-base lg:inline-flex"
+            onClick={() => setAddSongsOpen(true)}
+          >
+            <ListPlus data-icon="inline-start" />
+            Add songs to queue
+            <kbd className="ml-auto rounded border border-primary-foreground/30 px-1.5 py-0.5 font-mono text-[10px]">
+              /
+            </kbd>
+          </Button>
+
           <div className="flex items-center justify-between">
             <p className="eyebrow-mono text-mute">Invite</p>
             <Button
@@ -339,6 +429,20 @@ export function HostRoomPage() {
           </Button>
         </aside>
       </div>
+
+      {!addSongsOpen ? (
+        <HostAddSongsFab
+          upcomingCount={myUpcomingCount}
+          onClick={() => setAddSongsOpen(true)}
+        />
+      ) : null}
+
+      <HostAddSongsSheet
+        open={addSongsOpen}
+        onOpenChange={setAddSongsOpen}
+        myUpcomingCount={myUpcomingCount}
+        onAddSong={handleAddSong}
+      />
     </div>
   )
 }

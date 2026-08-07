@@ -145,7 +145,7 @@
   }
 
   .eyebrow-mono {
-    @apply text-sm font-semibold uppercase tracking-[2.52px];
+    @apply text-xs font-semibold uppercase tracking-[1.6px] sm:text-sm sm:tracking-[2.52px];
   }
 
   .display-xl {
