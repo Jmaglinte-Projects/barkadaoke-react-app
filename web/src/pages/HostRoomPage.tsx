@@ -1,0 +1,344 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+
+import { AppNav } from '@/components/layout/AppNav'
+import { HostControls } from '@/components/player/HostControls'
+import {
+  YouTubePlayer,
+  type YouTubePlayerHandle,
+} from '@/components/player/YouTubePlayer'
+import { CurrentSinger } from '@/components/queue/CurrentSinger'
+import { NextSinger } from '@/components/queue/NextSinger'
+import { QueueList } from '@/components/queue/QueueList'
+import { MemberList } from '@/components/room/MemberList'
+import { RoomHeader } from '@/components/room/RoomHeader'
+import { RoomQRCode } from '@/components/room/RoomQRCode'
+import { Button } from '@/components/ui/button'
+import {
+  advanceQueue,
+  removeQueueItem,
+  startFirstSong,
+} from '@/firebase/queue'
+import { endRoom, setRoomPlaybackState } from '@/firebase/rooms'
+import { useActiveRoom } from '@/hooks/useActiveRoom'
+import { useAuth } from '@/hooks/useAuth'
+import { useEnsureRoomMembership } from '@/hooks/useEnsureRoomMembership'
+import { useQueue } from '@/hooks/useQueue'
+import { useRoom } from '@/hooks/useRoom'
+import { useRoomMembers } from '@/hooks/useRoomMembers'
+import { useSavedSongs } from '@/hooks/useSavedSongs'
+import {
+  getCurrentSong,
+  getNextSong,
+  getUpcomingQueue,
+  getVisibleQueue,
+} from '@/lib/queue'
+import type { PlaybackState } from '@/types/youtube'
+
+export function HostRoomPage() {
+  const { roomId } = useParams()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { setActiveRoom, clearActiveRoom } = useActiveRoom()
+  const playerRef = useRef<YouTubePlayerHandle>(null)
+  const [showQr, setShowQr] = useState(true)
+  const [isActing, setIsActing] = useState(false)
+
+  const { isJoining, error: joinError } = useEnsureRoomMembership(roomId, user)
+  const { room, isLoading: roomLoading, error: roomError } = useRoom(roomId)
+  const { members } = useRoomMembers(roomId)
+  const { queue } = useQueue(roomId)
+  const { isSaved, pendingVideoId, toggleQueueItemBookmark } = useSavedSongs()
+
+  useEffect(() => {
+    if (!room || !user) return
+    if (room.status === 'ended') {
+      clearActiveRoom()
+      return
+    }
+    setActiveRoom({
+      roomId: room.id,
+      roomCode: room.roomCode,
+      name: room.name,
+      role: 'host',
+    })
+  }, [room, user, setActiveRoom, clearActiveRoom])
+
+  const current = useMemo(
+    () => getCurrentSong(queue, room?.currentQueueItemId ?? null),
+    [queue, room?.currentQueueItemId],
+  )
+  const upcoming = useMemo(() => getUpcomingQueue(queue), [queue])
+  const next = useMemo(() => getNextSong(queue), [queue])
+  const visibleQueue = useMemo(() => getVisibleQueue(queue), [queue])
+  const isHost = Boolean(user && room && room.hostUserId === user.uid)
+
+  const isEndingRef = useRef(false)
+  const isAdvancingRef = useRef(false)
+  const queueRef = useRef(queue)
+  const roomRef = useRef(room)
+
+  useEffect(() => {
+    queueRef.current = queue
+  }, [queue])
+
+  useEffect(() => {
+    roomRef.current = room
+  }, [room])
+
+  const syncPlaybackState = useCallback(
+    (state: PlaybackState) => {
+      if (!roomId || isEndingRef.current) return
+      if (room?.status === 'ended') return
+      if (room?.playbackState === state) return
+      void setRoomPlaybackState(roomId, state).catch(() => {
+        // Ignore transient sync errors; controls still work locally.
+      })
+    },
+    [roomId, room?.playbackState, room?.status],
+  )
+
+  const handleEnded = useCallback(() => {
+    if (!roomId || isEndingRef.current || isAdvancingRef.current) return
+
+    const currentRoom = roomRef.current
+    const currentQueue = queueRef.current
+    if (!currentRoom || currentRoom.status === 'ended') return
+
+    const nextSong = getNextSong(currentQueue)
+    if (!nextSong || !currentRoom.currentQueueItemId) {
+      syncPlaybackState('ended')
+      toast.message('Queue finished — add another song when ready')
+      return
+    }
+
+    isAdvancingRef.current = true
+    void advanceQueue(
+      roomId,
+      currentQueue,
+      currentRoom.currentQueueItemId,
+      'next',
+    )
+      .then(() => {
+        toast.success(`Up next: ${nextSong.singerName}`)
+      })
+      .catch((error) => {
+        syncPlaybackState('ended')
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Could not start the next song',
+        )
+      })
+      .finally(() => {
+        isAdvancingRef.current = false
+      })
+  }, [roomId, syncPlaybackState])
+
+  if (!user) {
+    return null
+  }
+
+  if (isJoining || roomLoading) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background">
+        <p className="text-sm text-body">Loading host view…</p>
+      </div>
+    )
+  }
+
+  if (joinError || roomError || !room) {
+    return (
+      <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-background px-4">
+        <p className="whitespace-pre-line text-center text-sm text-destructive">
+          {joinError || roomError || 'Room not found.'}
+        </p>
+        <Button asChild variant="outline">
+          <Link to="/home">Back to home</Link>
+        </Button>
+      </div>
+    )
+  }
+
+  if (!isHost) {
+    return <Navigate to={`/room/${room.id}`} replace />
+  }
+
+  if (room.status === 'ended') {
+    return <Navigate to="/home" replace />
+  }
+
+  async function handleAdvance(mode: 'next' | 'skip') {
+    if (!roomId || !room) return
+    setIsActing(true)
+    try {
+      if (!room.currentQueueItemId) {
+        await startFirstSong(roomId, queue)
+        toast.success('First song started')
+      } else {
+        await advanceQueue(roomId, queue, room.currentQueueItemId, mode)
+        toast.success(mode === 'skip' ? 'Song skipped' : 'Next song ready')
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Could not advance queue',
+      )
+    } finally {
+      setIsActing(false)
+    }
+  }
+
+  async function handleRemove(id: string) {
+    if (!roomId || !user || !room) return
+    const item = queue.find((entry) => entry.id === id)
+    if (!item) return
+
+    try {
+      if (item.id === room.currentQueueItemId) {
+        await advanceQueue(roomId, queue, room.currentQueueItemId, 'skip')
+      } else {
+        await removeQueueItem(roomId, item, user.uid, true)
+      }
+      toast.message('Song removed')
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to remove song',
+      )
+    }
+  }
+
+  async function handleEndRoom() {
+    if (!roomId || !user) return
+    const confirmed = window.confirm('End this karaoke room for everyone?')
+    if (!confirmed) return
+
+    setIsActing(true)
+    isEndingRef.current = true
+    try {
+      await endRoom(roomId, user.uid)
+      clearActiveRoom()
+      toast.success('Room ended')
+      navigate('/home')
+    } catch (error) {
+      isEndingRef.current = false
+      toast.error(error instanceof Error ? error.message : 'Failed to end room')
+      setIsActing(false)
+    }
+  }
+
+  return (
+    <div className="min-h-svh bg-background">
+      <AppNav />
+      <RoomHeader room={room} />
+
+      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_320px] lg:px-6">
+        <div className="space-y-4">
+          <YouTubePlayer
+            ref={playerRef}
+            song={current}
+            playbackState={room.playbackState}
+            onPlaybackStateChange={syncPlaybackState}
+            onEnded={handleEnded}
+          />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <CurrentSinger
+              song={current}
+              isSaved={current ? isSaved(current.youtubeVideoId) : false}
+              bookmarkPending={
+                current != null && pendingVideoId === current.youtubeVideoId
+              }
+              onToggleBookmark={
+                current
+                  ? () => {
+                      void toggleQueueItemBookmark(current)
+                    }
+                  : undefined
+              }
+            />
+            <NextSinger song={next} />
+          </div>
+
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="eyebrow-mono text-mute">Queue</p>
+              <span className="font-mono text-sm text-body">
+                {upcoming.length} upcoming
+              </span>
+            </div>
+            <QueueList
+              items={visibleQueue}
+              canRemoveAny
+              onRemove={handleRemove}
+              isSaved={isSaved}
+              pendingVideoId={pendingVideoId}
+              onToggleBookmark={(item) => {
+                void toggleQueueItemBookmark(item)
+              }}
+            />
+          </section>
+
+          <HostControls
+            playbackState={room.playbackState}
+            disabled={isActing}
+            hasCurrentSong={Boolean(current)}
+            hasUpcomingSong={upcoming.length > 0}
+            onPlay={() => {
+              // No current song yet — start the first queued track.
+              if (!current) {
+                void handleAdvance('next')
+                return
+              }
+              playerRef.current?.play()
+              syncPlaybackState('playing')
+            }}
+            onPause={() => {
+              playerRef.current?.pause()
+              syncPlaybackState('paused')
+            }}
+            onRestart={() => {
+              playerRef.current?.restart()
+              syncPlaybackState('playing')
+              toast.message('Restarted current song')
+            }}
+            onNext={() => {
+              void handleAdvance('next')
+            }}
+            onSkip={() => {
+              void handleAdvance('skip')
+            }}
+          />
+        </div>
+
+        <aside className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="eyebrow-mono text-mute">Invite</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowQr((value) => !value)}
+            >
+              {showQr ? 'Hide QR' : 'Show QR'}
+            </Button>
+          </div>
+          {showQr ? <RoomQRCode roomCode={room.roomCode} /> : null}
+          <MemberList members={members} />
+          <Button variant="outline" className="w-full" asChild>
+            <Link to={`/room/${room.id}`}>Open guest view</Link>
+          </Button>
+          <Button
+            variant="destructive"
+            className="w-full"
+            disabled={isActing}
+            onClick={() => {
+              void handleEndRoom()
+            }}
+          >
+            End room
+          </Button>
+        </aside>
+      </div>
+    </div>
+  )
+}

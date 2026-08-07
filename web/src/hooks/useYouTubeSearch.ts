@@ -1,0 +1,53 @@
+import { useEffect, useState } from 'react'
+
+import { searchKaraokeVideos } from '@/firebase/youtube'
+import type { SongSearchResult } from '@/types/youtube'
+
+const DEBOUNCE_MS = 550
+
+export function useYouTubeSearch(query: string) {
+  const [results, setResults] = useState<SongSearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [usedFallback, setUsedFallback] = useState(false)
+
+  useEffect(() => {
+    const trimmed = query.trim()
+    if (!trimmed) {
+      setResults([])
+      setIsSearching(false)
+      setError(null)
+      setUsedFallback(false)
+      return
+    }
+
+    let cancelled = false
+    setIsSearching(true)
+    setError(null)
+
+    const timer = window.setTimeout(() => {
+      void searchKaraokeVideos(trimmed)
+        .then((response) => {
+          if (cancelled) return
+          setResults(response.results)
+          setUsedFallback(response.usedFallback)
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          setResults([])
+          setUsedFallback(false)
+          setError(err instanceof Error ? err.message : 'Search failed')
+        })
+        .finally(() => {
+          if (!cancelled) setIsSearching(false)
+        })
+    }, DEBOUNCE_MS)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [query])
+
+  return { results, isSearching, error, usedFallback }
+}

@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isRoomHost(roomId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUserId
+          == request.auth.uid;
+    }
+
+    function isRoomMember(roomId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid));
+    }
+
+    match /rooms/{roomId} {
+      // Host creates the room with themselves as the first member (count = 1).
+      allow create: if isSignedIn()
+        && request.resource.data.hostUserId == request.auth.uid
+        && request.resource.data.roomCode is string
+        && request.resource.data.status in ['waiting', 'active']
+        && request.resource.data.memberCount == 1;
+
+      // Signed-in users can look up rooms by code / id.
+      allow read: if isSignedIn();
+
+      // Host controls room fields. Guest joins go through the joinRoom Cloud Function.
+      allow update: if isRoomHost(roomId);
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if isSignedIn();
+
+        // Only the host may create their own member doc from the client (room create).
+        // Guest membership is created by the trusted joinRoom Cloud Function (Admin SDK).
+        allow create: if isSignedIn()
+          && request.auth.uid == memberId
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.role == 'host';
+
+        allow update, delete: if isRoomHost(roomId);
+      }
+
+      match /queue/{queueItemId} {
+        allow read: if isSignedIn();
+
+        allow create: if isSignedIn()
+          && isRoomMember(roomId)
+          && request.resource.data.singerUserId == request.auth.uid
+          && request.resource.data.status == 'queued';
+
+        allow update: if isRoomHost(roomId)
+          || (
+            isRoomMember(roomId)
+            && resource.data.singerUserId == request.auth.uid
+            && request.resource.data.status == 'removed'
+            && request.resource.data.singerUserId == resource.data.singerUserId
+          );
+
+        allow delete: if false;
+      }
+    }
+
+    // Personal song bookmarks — private to the signed-in owner.
+    match /users/{userId} {
+      allow read, write: if false;
+
+      match /savedSongs/{videoId} {
+        allow read, delete: if isSignedIn() && request.auth.uid == userId;
+
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.videoId == videoId
+          && request.resource.data.title is string
+          && request.resource.data.thumbnailUrl is string;
+      }
+    }
+  }
+}

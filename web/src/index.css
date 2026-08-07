@@ -1,0 +1,179 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    monospace;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-body: var(--body);
+  --color-mute: var(--mute);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-deep: var(--primary-deep);
+  --color-ink-strong: var(--ink-strong);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+}
+
+/* Voltagent-inspired dark canvas — dark-only brand surface */
+:root,
+.dark {
+  --background: #101010;
+  --foreground: #f2f2f2;
+  --card: #101010;
+  --card-foreground: #f2f2f2;
+  --popover: #1a1a1a;
+  --popover-foreground: #f2f2f2;
+  --primary: #00d992;
+  --primary-foreground: #101010;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #f2f2f2;
+  --muted: #1a1a1a;
+  --muted-foreground: #8b949e;
+  --accent: #1a1a1a;
+  --accent-foreground: #f2f2f2;
+  --destructive: #ef4444;
+  --border: #3d3a39;
+  --input: #3d3a39;
+  --ring: #2fd6a1;
+  --chart-1: #00d992;
+  --chart-2: #2fd6a1;
+  --chart-3: #10b981;
+  --chart-4: #bdbdbd;
+  --chart-5: #8b949e;
+  --radius: 0.5rem;
+  --sidebar: #101010;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #00d992;
+  --sidebar-primary-foreground: #101010;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-border: #3d3a39;
+  --sidebar-ring: #2fd6a1;
+
+  /* Brand tokens */
+  --body: #bdbdbd;
+  --mute: #8b949e;
+  --canvas-soft: #1a1a1a;
+  --primary-soft: #2fd6a1;
+  --primary-deep: #10b981;
+  --ink-strong: #ffffff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans antialiased;
+    font-feature-settings: 'calt' 1, 'rlig' 1;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground min-h-svh;
+  }
+
+  #root {
+    @apply min-h-svh;
+  }
+}
+
+@layer utilities {
+  .text-body {
+    color: var(--body);
+  }
+
+  .text-mute {
+    color: var(--mute);
+  }
+
+  .text-ink-strong {
+    color: var(--ink-strong);
+  }
+
+  .bg-canvas-soft {
+    background-color: var(--canvas-soft);
+  }
+
+  .text-primary-soft {
+    color: var(--primary-soft);
+  }
+
+  .eyebrow-mono {
+    @apply text-sm font-semibold uppercase tracking-[2.52px];
+  }
+
+  .display-xl {
+    @apply text-[32px] leading-[36px] font-normal tracking-[-0.65px] md:text-[60px] md:leading-[60px];
+    color: var(--ink-strong);
+  }
+
+  .display-lg {
+    @apply text-[28px] leading-[32px] font-normal tracking-[-0.9px] md:text-[36px] md:leading-[40px];
+  }
+
+  .display-md {
+    @apply text-2xl leading-8 font-bold tracking-[-0.6px];
+  }
+
+  .display-sm {
+    @apply text-xl leading-7 font-semibold;
+  }
+
+  .hairline-card {
+    @apply rounded-md border border-border bg-background;
+  }
+
+  .dashed-divider {
+    border-top: 1px dashed rgba(79, 93, 117, 0.4);
+  }
+
+  .green-divider {
+    border-top: 2px solid var(--primary);
+  }
+}
