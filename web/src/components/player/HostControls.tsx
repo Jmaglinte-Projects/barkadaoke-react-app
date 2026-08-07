@@ -36,47 +36,62 @@ export function HostControls({
   const canStart = hasCurrentSong || hasUpcomingSong
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-border bg-background px-4 py-4 md:px-6">
-      <Button
-        variant="outline"
-        size="lg"
-        disabled={disabled || !hasCurrentSong}
-        onClick={onRestart}
-      >
-        <RotateCcw data-icon="inline-start" />
-        Restart
-      </Button>
+    <div className="border-t border-border bg-background px-4 py-4 md:px-6">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        {isPlaying && hasCurrentSong ? (
+          <Button
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={disabled}
+            onClick={onPause}
+          >
+            <Pause data-icon="inline-start" />
+            Pause
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={disabled || !canStart}
+            onClick={onPlay}
+          >
+            <Play data-icon="inline-start" />
+            Play
+          </Button>
+        )}
 
-      {isPlaying && hasCurrentSong ? (
-        <Button size="lg" disabled={disabled} onClick={onPause}>
-          <Pause data-icon="inline-start" />
-          Pause
+        <Button
+          size="lg"
+          className="w-full sm:w-auto"
+          disabled={disabled || !canStart}
+          onClick={onNext}
+        >
+          <StepForward data-icon="inline-start" />
+          {hasCurrentSong ? 'Next' : 'Start'}
         </Button>
-      ) : (
-        <Button size="lg" disabled={disabled || !canStart} onClick={onPlay}>
-          <Play data-icon="inline-start" />
-          Play
+
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full sm:w-auto"
+          disabled={disabled || !hasCurrentSong}
+          onClick={onRestart}
+        >
+          <RotateCcw data-icon="inline-start" />
+          Restart
         </Button>
-      )}
 
-      <Button
-        variant="outline"
-        size="lg"
-        disabled={disabled || !hasCurrentSong}
-        onClick={onSkip}
-      >
-        <SkipForward data-icon="inline-start" />
-        Skip
-      </Button>
-
-      <Button
-        size="lg"
-        disabled={disabled || !canStart}
-        onClick={onNext}
-      >
-        <StepForward data-icon="inline-start" />
-        {hasCurrentSong ? 'Next' : 'Start'}
-      </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full sm:w-auto"
+          disabled={disabled || !hasCurrentSong}
+          onClick={onSkip}
+        >
+          <SkipForward data-icon="inline-start" />
+          Skip
+        </Button>
+      </div>
     </div>
   )
 }

@@ -232,8 +232,8 @@ export function HostRoomPage() {
       <AppNav />
       <RoomHeader room={room} />
 
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_320px] lg:px-6">
-        <div className="space-y-4">
+      <div className="mx-auto grid max-w-7xl gap-4 overflow-x-hidden px-4 py-4 lg:grid-cols-[1fr_320px] lg:px-6">
+        <div className="min-w-0 space-y-4">
           <YouTubePlayer
             ref={playerRef}
             song={current}
@@ -259,25 +259,6 @@ export function HostRoomPage() {
             />
             <NextSinger song={next} />
           </div>
-
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <p className="eyebrow-mono text-mute">Queue</p>
-              <span className="font-mono text-sm text-body">
-                {upcoming.length} upcoming
-              </span>
-            </div>
-            <QueueList
-              items={visibleQueue}
-              canRemoveAny
-              onRemove={handleRemove}
-              isSaved={isSaved}
-              pendingVideoId={pendingVideoId}
-              onToggleBookmark={(item) => {
-                void toggleQueueItemBookmark(item)
-              }}
-            />
-          </section>
 
           <HostControls
             playbackState={room.playbackState}
@@ -309,9 +290,28 @@ export function HostRoomPage() {
               void handleAdvance('skip')
             }}
           />
+
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="eyebrow-mono text-mute">Queue</p>
+              <span className="font-mono text-sm text-body">
+                {upcoming.length} upcoming
+              </span>
+            </div>
+            <QueueList
+              items={visibleQueue}
+              canRemoveAny
+              onRemove={handleRemove}
+              isSaved={isSaved}
+              pendingVideoId={pendingVideoId}
+              onToggleBookmark={(item) => {
+                void toggleQueueItemBookmark(item)
+              }}
+            />
+          </section>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <div className="flex items-center justify-between">
             <p className="eyebrow-mono text-mute">Invite</p>
             <Button

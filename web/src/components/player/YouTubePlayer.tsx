@@ -147,7 +147,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
 
     if (!song) {
       return (
-        <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-canvas-soft">
+        <div className="relative aspect-video w-full max-w-full overflow-hidden rounded-md border border-border bg-canvas-soft">
           <div className="flex size-full flex-col items-center justify-center gap-2 p-6 text-center">
             <p className="eyebrow-mono text-mute">Ready when you are</p>
             <p className="text-body">
@@ -159,30 +159,34 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     }
 
     return (
-      <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-black">
-        <div id={containerId} className="size-full" />
+      // Absolute fill keeps the YouTube iframe inside the 16:9 box on mobile;
+      // otherwise the API iframe can overflow and cover content below.
+      <div className="relative isolate aspect-video w-full max-w-full overflow-hidden rounded-md border border-border bg-black">
+        <div className="absolute inset-0 [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0">
+          <div id={containerId} className="h-full w-full" />
+        </div>
 
         {!isReady && !apiError ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-canvas-soft/80">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-canvas-soft/80">
             <p className="text-sm text-body">Loading player…</p>
           </div>
         ) : null}
 
         {apiError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-canvas-soft p-6 text-center">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-canvas-soft p-6 text-center">
             <p className="text-sm text-destructive">{apiError}</p>
             <p className="text-xs text-mute">{song.title}</p>
           </div>
         ) : null}
 
         {playbackState === 'autoplay_blocked' ? (
-          <div className="absolute inset-x-0 bottom-0 bg-background/90 px-4 py-2 text-center text-xs text-body">
+          <div className="absolute inset-x-0 bottom-0 z-10 bg-background/90 px-4 py-2 text-center text-xs text-body">
             Autoplay blocked — press Play to start.
           </div>
         ) : null}
 
         {playbackState === 'ended' ? (
-          <div className="absolute inset-x-0 bottom-0 bg-background/90 px-4 py-2 text-center text-xs text-body">
+          <div className="absolute inset-x-0 bottom-0 z-10 bg-background/90 px-4 py-2 text-center text-xs text-body">
             Song ended — queue is empty. Add another song or press Start.
           </div>
         ) : null}
