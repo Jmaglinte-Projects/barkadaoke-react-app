@@ -7,6 +7,7 @@ import { HomePage } from '@/pages/HomePage'
 import { HostRoomPage } from '@/pages/HostRoomPage'
 import { JoinRoomPage } from '@/pages/JoinRoomPage'
 import { LandingPage } from '@/pages/LandingPage'
+import { RemoteControlPage } from '@/pages/RemoteControlPage'
 import { SavedSongsPage } from '@/pages/SavedSongsPage'
 
 export function AppRouter() {
@@ -54,6 +55,14 @@ export function AppRouter() {
           element={
             <AuthGate>
               <HostRoomPage />
+            </AuthGate>
+          }
+        />
+        <Route
+          path="/room/:roomId/remote"
+          element={
+            <AuthGate redirectTo="/join">
+              <RemoteControlPage />
             </AuthGate>
           }
         />

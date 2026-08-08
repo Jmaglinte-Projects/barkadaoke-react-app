@@ -16,8 +16,14 @@ import { httpsCallable } from 'firebase/functions'
 
 import { getDb, getFirebaseFunctions } from '@/firebase/config'
 import { mapMember, mapRoom } from '@/firebase/mappers'
+import { roleSortRank } from '@/lib/playback'
 import { generateRoomCode, normalizeRoomCode } from '@/lib/room-code'
-import type { KaraokeRoom, RoomMember } from '@/types/room'
+import type {
+  AssignableMemberRole,
+  KaraokeRoom,
+  PlaybackCommandType,
+  RoomMember,
+} from '@/types/room'
 import type { UserProfile } from '@/types/user'
 import type { PlaybackState } from '@/types/youtube'
 
@@ -103,6 +109,9 @@ export async function createRoom(
     status: 'active',
     currentQueueItemId: null,
     playbackState: 'idle',
+    playbackCommand: null,
+    playerLastSeenAt: null,
+    playerDeviceId: null,
     memberCount: 1,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -124,6 +133,9 @@ export async function createRoom(
     status: 'active',
     currentQueueItemId: null,
     playbackState: 'idle',
+    playbackCommand: null,
+    playerLastSeenAt: null,
+    playerDeviceId: null,
     memberCount: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -177,6 +189,9 @@ export async function joinRoom(
       status: data.status as KaraokeRoom['status'],
       currentQueueItemId: null,
       playbackState: 'idle',
+      playbackCommand: null,
+      playerLastSeenAt: null,
+      playerDeviceId: null,
       memberCount: data.memberCount,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -213,6 +228,9 @@ export async function joinRoomByCode(
       status: data.status as KaraokeRoom['status'],
       currentQueueItemId: null,
       playbackState: 'idle',
+      playbackCommand: null,
+      playerLastSeenAt: null,
+      playerDeviceId: null,
       memberCount: data.memberCount,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -267,6 +285,75 @@ export async function setRoomPlaybackState(
   })
 }
 
+export async function issuePlaybackCommand(
+  roomId: string,
+  type: PlaybackCommandType,
+  issuedBy: string,
+): Promise<string> {
+  const id =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  await updateDoc(doc(getDb(), 'rooms', roomId), {
+    playbackCommand: {
+      id,
+      type,
+      issuedBy,
+      issuedAt: new Date().toISOString(),
+    },
+    updatedAt: serverTimestamp(),
+  })
+
+  return id
+}
+
+export async function setPlayerPresence(
+  roomId: string,
+  deviceId: string,
+): Promise<void> {
+  // Single low-frequency room write — remotes already listen to the room doc.
+  await updateDoc(doc(getDb(), 'rooms', roomId), {
+    playerLastSeenAt: new Date().toISOString(),
+    playerDeviceId: deviceId,
+  })
+}
+
+export async function clearPlayerPresence(
+  roomId: string,
+  deviceId: string,
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room?.playerDeviceId || room.playerDeviceId !== deviceId) return
+
+  await updateDoc(doc(getDb(), 'rooms', roomId), {
+    playerLastSeenAt: null,
+    playerDeviceId: null,
+  })
+}
+
+export async function setMemberPlaybackRole(
+  roomId: string,
+  memberUserId: string,
+  role: AssignableMemberRole,
+  hostUserId: string,
+): Promise<void> {
+  const room = await getRoom(roomId)
+  if (!room) {
+    throw new Error('Room not found.')
+  }
+  if (room.hostUserId !== hostUserId) {
+    throw new Error('Only the host can change playback permissions.')
+  }
+  if (memberUserId === room.hostUserId) {
+    throw new Error('The host always has playback control.')
+  }
+
+  await updateDoc(doc(getDb(), 'rooms', roomId, 'members', memberUserId), {
+    role,
+  })
+}
+
 export function subscribeToRoom(
   roomId: string,
   onChange: (room: KaraokeRoom | null) => void,
@@ -296,10 +383,9 @@ export function subscribeToRoomMembers(
       const members = snapshot.docs
         .map((docSnap) => mapMember(docSnap.id, docSnap.data()))
         .sort((a, b) => {
-          if (a.role === b.role) {
-            return a.displayName.localeCompare(b.displayName)
-          }
-          return a.role === 'host' ? -1 : 1
+          const rankDiff = roleSortRank(a.role) - roleSortRank(b.role)
+          if (rankDiff !== 0) return rankDiff
+          return a.displayName.localeCompare(b.displayName)
         })
       onChange(members)
     },

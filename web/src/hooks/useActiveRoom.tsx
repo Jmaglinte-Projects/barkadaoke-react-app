@@ -15,7 +15,7 @@ export type ActiveRoomSession = {
   roomId: string
   roomCode: string
   name: string
-  role: 'host' | 'guest'
+  role: 'host' | 'controller' | 'guest'
 }
 
 type ActiveRoomContextValue = {

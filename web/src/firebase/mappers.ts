@@ -1,7 +1,12 @@
 import type { DocumentData, Timestamp } from 'firebase/firestore'
 
 import type { QueueItem } from '@/types/queue'
-import type { KaraokeRoom, RoomMember } from '@/types/room'
+import type {
+  KaraokeRoom,
+  PlaybackCommand,
+  RoomMember,
+  RoomRole,
+} from '@/types/room'
 import type { SavedSong } from '@/types/saved-song'
 
 function toIso(value: unknown): string {
@@ -18,6 +23,37 @@ function toIso(value: unknown): string {
   return new Date().toISOString()
 }
 
+function mapRoomRole(value: unknown): RoomRole {
+  if (value === 'host' || value === 'controller' || value === 'guest') {
+    return value
+  }
+  return 'guest'
+}
+
+function mapPlaybackCommand(value: unknown): PlaybackCommand | null {
+  if (!value || typeof value !== 'object') return null
+  const data = value as Record<string, unknown>
+  const type = data.type
+  if (
+    type !== 'play' &&
+    type !== 'pause' &&
+    type !== 'next' &&
+    type !== 'skip' &&
+    type !== 'restart'
+  ) {
+    return null
+  }
+  const id = typeof data.id === 'string' ? data.id : null
+  const issuedBy = typeof data.issuedBy === 'string' ? data.issuedBy : null
+  if (!id || !issuedBy) return null
+  return {
+    id,
+    type,
+    issuedBy,
+    issuedAt: toIso(data.issuedAt),
+  }
+}
+
 export function mapRoom(id: string, data: DocumentData): KaraokeRoom {
   return {
     id,
@@ -30,6 +66,11 @@ export function mapRoom(id: string, data: DocumentData): KaraokeRoom {
         ? data.currentQueueItemId
         : null,
     playbackState: (data.playbackState as KaraokeRoom['playbackState']) ?? 'idle',
+    playbackCommand: mapPlaybackCommand(data.playbackCommand),
+    playerLastSeenAt:
+      typeof data.playerLastSeenAt === 'string' ? data.playerLastSeenAt : null,
+    playerDeviceId:
+      typeof data.playerDeviceId === 'string' ? data.playerDeviceId : null,
     memberCount: Number(data.memberCount ?? 0),
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
@@ -42,7 +83,7 @@ export function mapMember(id: string, data: DocumentData): RoomMember {
     displayName: String(data.displayName ?? 'Guest'),
     photoURL:
       typeof data.photoURL === 'string' ? data.photoURL : undefined,
-    role: data.role === 'host' ? 'host' : 'guest',
+    role: mapRoomRole(data.role),
     joinedAt: toIso(data.joinedAt),
   }
 }

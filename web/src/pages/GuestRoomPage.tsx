@@ -22,6 +22,7 @@ import { useQueue } from '@/hooks/useQueue'
 import { useRoom } from '@/hooks/useRoom'
 import { useRoomMembers } from '@/hooks/useRoomMembers'
 import { useSavedSongs } from '@/hooks/useSavedSongs'
+import { canControlPlayback, getMemberRole } from '@/lib/playback'
 import {
   getCurrentSong,
   getNextSong,
@@ -56,6 +57,7 @@ export function GuestRoomPage() {
     toggleQueueItemBookmark,
   } = useSavedSongs()
 
+  const memberRole = getMemberRole(user?.uid, room, members)
   useEffect(() => {
     if (!room || !user) return
     if (room.status === 'ended') {
@@ -66,9 +68,23 @@ export function GuestRoomPage() {
       roomId: room.id,
       roomCode: room.roomCode,
       name: room.name,
-      role: room.hostUserId === user.uid ? 'host' : 'guest',
+      role:
+        memberRole === 'host'
+          ? 'host'
+          : memberRole === 'controller'
+            ? 'controller'
+            : 'guest',
     })
-  }, [room, user, setActiveRoom, clearActiveRoom])
+  }, [
+    room?.id,
+    room?.roomCode,
+    room?.name,
+    room?.status,
+    memberRole,
+    user,
+    setActiveRoom,
+    clearActiveRoom,
+  ])
 
   const current = useMemo(
     () => getCurrentSong(queue, room?.currentQueueItemId ?? null),
@@ -86,6 +102,7 @@ export function GuestRoomPage() {
   const atUpcomingLimit = myUpcoming.length >= MAX_UPCOMING_SONGS_PER_USER
   const visibleQueue = useMemo(() => getVisibleQueue(queue), [queue])
   const isHost = Boolean(user && room && room.hostUserId === user.uid)
+  const canControl = canControlPlayback(user?.uid, room, members)
 
   if (!user) {
     return null
@@ -219,6 +236,11 @@ export function GuestRoomPage() {
               )}
             </div>
             <MemberList members={members} />
+            {canControl ? (
+              <Button variant="outline" className="w-full" asChild>
+                <Link to={`/room/${room.id}/remote`}>Open remote control</Link>
+              </Button>
+            ) : null}
             {isHost ? (
               <Button variant="outline" className="w-full" asChild>
                 <Link to={`/room/${room.id}/host`}>Open host controls</Link>

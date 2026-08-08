@@ -26,7 +26,13 @@ import {
   removeQueueItem,
   startFirstSong,
 } from '@/firebase/queue'
-import { endRoom, setRoomPlaybackState } from '@/firebase/rooms'
+import {
+  clearPlayerPresence,
+  endRoom,
+  setMemberPlaybackRole,
+  setPlayerPresence,
+  setRoomPlaybackState,
+} from '@/firebase/rooms'
 import { useActiveRoom } from '@/hooks/useActiveRoom'
 import { useAuth } from '@/hooks/useAuth'
 import { useEnsureRoomMembership } from '@/hooks/useEnsureRoomMembership'
@@ -34,12 +40,15 @@ import { useQueue } from '@/hooks/useQueue'
 import { useRoom } from '@/hooks/useRoom'
 import { useRoomMembers } from '@/hooks/useRoomMembers'
 import { useSavedSongs } from '@/hooks/useSavedSongs'
+import { getDeviceId } from '@/lib/device-id'
 import {
   getCurrentSong,
   getNextSong,
   getUpcomingQueue,
   getVisibleQueue,
 } from '@/lib/queue'
+import type { AssignableMemberRole, PlaybackCommand } from '@/types/room'
+import { PLAYER_PRESENCE_HEARTBEAT_MS } from '@/types/room'
 import type { PlaybackState, SongSearchResult } from '@/types/youtube'
 
 export function HostRoomPage() {
@@ -51,6 +60,9 @@ export function HostRoomPage() {
   const [showQr, setShowQr] = useState(true)
   const [isActing, setIsActing] = useState(false)
   const [addSongsOpen, setAddSongsOpen] = useState(false)
+  const [rolePendingUserId, setRolePendingUserId] = useState<string | null>(
+    null,
+  )
 
   const { isJoining, error: joinError } = useEnsureRoomMembership(roomId, user)
   const { room, isLoading: roomLoading, error: roomError } = useRoom(roomId)
@@ -70,7 +82,16 @@ export function HostRoomPage() {
       name: room.name,
       role: 'host',
     })
-  }, [room, user, setActiveRoom, clearActiveRoom])
+    // Identity fields only — avoid localStorage writes on every playback tick.
+  }, [
+    room?.id,
+    room?.roomCode,
+    room?.name,
+    room?.status,
+    user,
+    setActiveRoom,
+    clearActiveRoom,
+  ])
 
   const current = useMemo(
     () => getCurrentSong(queue, room?.currentQueueItemId ?? null),
@@ -112,6 +133,12 @@ export function HostRoomPage() {
   const isAdvancingRef = useRef(false)
   const queueRef = useRef(queue)
   const roomRef = useRef(room)
+  const lastProcessedCommandIdRef = useRef<string | null>(null)
+  const commandsHydratedRef = useRef(false)
+  const deviceIdRef = useRef(getDeviceId())
+  const roomStatus = room?.status
+  const playbackCommand = room?.playbackCommand ?? null
+  const playbackCommandId = playbackCommand?.id ?? null
 
   useEffect(() => {
     queueRef.current = queue
@@ -132,6 +159,167 @@ export function HostRoomPage() {
     },
     [roomId, room?.playbackState, room?.status],
   )
+
+  const handleAdvance = useCallback(
+    async (mode: 'next' | 'skip') => {
+      if (!roomId) return
+
+      const currentRoom = roomRef.current
+      const currentQueue = queueRef.current
+      if (!currentRoom || currentRoom.status === 'ended') return
+
+      const nextSong = getNextSong(currentQueue)
+      const hasCurrent = Boolean(currentRoom.currentQueueItemId)
+
+      if (!hasCurrent && !nextSong) {
+        toast.message('Queue is empty — add a song first')
+        return
+      }
+
+      setIsActing(true)
+      try {
+        if (!hasCurrent) {
+          await startFirstSong(roomId, currentQueue)
+          toast.success('First song started')
+          return
+        }
+
+        await advanceQueue(
+          roomId,
+          currentQueue,
+          currentRoom.currentQueueItemId,
+          mode,
+        )
+        if (nextSong) {
+          toast.success(
+            mode === 'skip'
+              ? `Skipped — up next: ${nextSong.singerName}`
+              : `Up next: ${nextSong.singerName}`,
+          )
+        } else {
+          toast.message(
+            mode === 'skip' ? 'Song skipped — queue finished' : 'Queue finished',
+          )
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : 'Could not advance queue',
+        )
+      } finally {
+        setIsActing(false)
+      }
+    },
+    [roomId],
+  )
+
+  const executePlaybackCommand = useCallback(
+    (command: PlaybackCommand) => {
+      if (!roomId || isEndingRef.current) return
+
+      const currentRoom = roomRef.current
+      const currentQueue = queueRef.current
+      if (!currentRoom || currentRoom.status === 'ended') return
+
+      const currentSong = getCurrentSong(
+        currentQueue,
+        currentRoom.currentQueueItemId,
+      )
+
+      switch (command.type) {
+        case 'play': {
+          if (!currentSong) {
+            void handleAdvance('next')
+            return
+          }
+          playerRef.current?.play()
+          syncPlaybackState('playing')
+          return
+        }
+        case 'pause': {
+          playerRef.current?.pause()
+          syncPlaybackState('paused')
+          return
+        }
+        case 'restart': {
+          if (!currentSong) return
+          playerRef.current?.restart()
+          syncPlaybackState('playing')
+          toast.message('Restarted current song')
+          return
+        }
+        case 'next': {
+          void handleAdvance('next')
+          return
+        }
+        case 'skip': {
+          void handleAdvance('skip')
+          return
+        }
+        default:
+          return
+      }
+    },
+    [handleAdvance, roomId, syncPlaybackState],
+  )
+
+  // Authoritative player: process remote/controller commands once each.
+  useEffect(() => {
+    if (!isHost) return
+
+    if (!playbackCommand || !playbackCommandId) {
+      commandsHydratedRef.current = true
+      return
+    }
+
+    // Ignore whatever command was already on the room when this player tab opened.
+    if (!commandsHydratedRef.current) {
+      lastProcessedCommandIdRef.current = playbackCommandId
+      commandsHydratedRef.current = true
+      return
+    }
+
+    if (lastProcessedCommandIdRef.current === playbackCommandId) return
+    lastProcessedCommandIdRef.current = playbackCommandId
+    executePlaybackCommand(playbackCommand)
+  }, [executePlaybackCommand, isHost, playbackCommand, playbackCommandId])
+
+  // Publish player presence on a stable interval. Do NOT depend on `room` —
+  // that previously restarted the heartbeat on every write and stormed Firebase.
+  // Important: do not clear presence in the effect cleanup — React Strict Mode
+  // (and fast remounts) race the async clear against the next beat and leave
+  // remotes stuck on "No player connected".
+  useEffect(() => {
+    if (!roomId || !isHost || roomStatus === 'ended') return
+    const activeRoomId = roomId
+
+    const deviceId = deviceIdRef.current
+    let cancelled = false
+
+    async function beat() {
+      if (cancelled || isEndingRef.current) return
+      try {
+        await setPlayerPresence(activeRoomId, deviceId)
+      } catch (error) {
+        console.warn('[barkadaoke] player presence write failed', error)
+      }
+    }
+
+    void beat()
+    const interval = window.setInterval(() => {
+      void beat()
+    }, PLAYER_PRESENCE_HEARTBEAT_MS)
+
+    function onUnload() {
+      void clearPlayerPresence(activeRoomId, deviceId)
+    }
+    window.addEventListener('pagehide', onUnload)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      window.removeEventListener('pagehide', onUnload)
+    }
+  }, [isHost, roomId, roomStatus])
 
   const handleEnded = useCallback(() => {
     if (!roomId || isEndingRef.current || isAdvancingRef.current) return
@@ -203,47 +391,6 @@ export function HostRoomPage() {
     return <Navigate to="/home" replace />
   }
 
-  async function handleAdvance(mode: 'next' | 'skip') {
-    if (!roomId || !room) return
-
-    const nextSong = getNextSong(queue)
-    const hasCurrent = Boolean(room.currentQueueItemId)
-
-    // Nothing to play or advance — stay on this page and tell the host.
-    if (!hasCurrent && !nextSong) {
-      toast.message('Queue is empty — add a song first')
-      return
-    }
-
-    setIsActing(true)
-    try {
-      if (!hasCurrent) {
-        await startFirstSong(roomId, queue)
-        toast.success('First song started')
-        return
-      }
-
-      await advanceQueue(roomId, queue, room.currentQueueItemId, mode)
-      if (nextSong) {
-        toast.success(
-          mode === 'skip'
-            ? `Skipped — up next: ${nextSong.singerName}`
-            : `Up next: ${nextSong.singerName}`,
-        )
-      } else {
-        toast.message(
-          mode === 'skip' ? 'Song skipped — queue finished' : 'Queue finished',
-        )
-      }
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Could not advance queue',
-      )
-    } finally {
-      setIsActing(false)
-    }
-  }
-
   async function handleAddSong(result: SongSearchResult) {
     if (!roomId || !user) return
     try {
@@ -281,6 +428,7 @@ export function HostRoomPage() {
     setIsActing(true)
     isEndingRef.current = true
     try {
+      await clearPlayerPresence(roomId, deviceIdRef.current)
       await endRoom(roomId, user.uid)
       clearActiveRoom()
       toast.success('Room ended')
@@ -289,6 +437,30 @@ export function HostRoomPage() {
       isEndingRef.current = false
       toast.error(error instanceof Error ? error.message : 'Failed to end room')
       setIsActing(false)
+    }
+  }
+
+  async function handleChangeRole(
+    memberUserId: string,
+    role: AssignableMemberRole,
+  ) {
+    if (!roomId || !user) return
+    setRolePendingUserId(memberUserId)
+    try {
+      await setMemberPlaybackRole(roomId, memberUserId, role, user.uid)
+      toast.success(
+        role === 'controller'
+          ? 'Granted playback control'
+          : 'Removed playback control',
+      )
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update participant role',
+      )
+    } finally {
+      setRolePendingUserId(null)
     }
   }
 
@@ -413,7 +585,17 @@ export function HostRoomPage() {
             </Button>
           </div>
           {showQr ? <RoomQRCode roomCode={room.roomCode} /> : null}
-          <MemberList members={members} />
+          <MemberList
+            members={members}
+            canManageRoles
+            rolePendingUserId={rolePendingUserId}
+            onChangeRole={(memberUserId, role) => {
+              void handleChangeRole(memberUserId, role)
+            }}
+          />
+          <Button variant="outline" className="w-full" asChild>
+            <Link to={`/room/${room.id}/remote`}>Open remote control</Link>
+          </Button>
           <Button variant="outline" className="w-full" asChild>
             <Link to={`/room/${room.id}`}>Open guest view</Link>
           </Button>

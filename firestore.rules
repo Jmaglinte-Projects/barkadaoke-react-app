@@ -5,15 +5,47 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function roomDoc(roomId) {
+      return get(/databases/$(database)/documents/rooms/$(roomId)).data;
+    }
+
+    function memberDoc(roomId, uid) {
+      return get(/databases/$(database)/documents/rooms/$(roomId)/members/$(uid)).data;
+    }
+
     function isRoomHost(roomId) {
       return isSignedIn()
-        && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUserId
-          == request.auth.uid;
+        && roomDoc(roomId).hostUserId == request.auth.uid;
     }
 
     function isRoomMember(roomId) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid));
+    }
+
+    function memberRole(roomId) {
+      return memberDoc(roomId, request.auth.uid).role;
+    }
+
+    // Host always controls playback; controllers are explicitly promoted.
+    function canIssuePlaybackCommand(roomId) {
+      return isRoomHost(roomId)
+        || (isRoomMember(roomId) && memberRole(roomId) == 'controller');
+    }
+
+    function isValidPlaybackCommand(command) {
+      return command is map
+        && command.keys().hasOnly(['id', 'type', 'issuedBy', 'issuedAt'])
+        && command.id is string
+        && command.id.size() > 0
+        && command.type in ['play', 'pause', 'next', 'skip', 'restart']
+        && command.issuedBy == request.auth.uid
+        && command.issuedAt is string;
+    }
+
+    function onlyPlaybackCommandChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['playbackCommand', 'updatedAt']);
     }
 
     match /rooms/{roomId} {
@@ -27,8 +59,13 @@ service cloud.firestore {
       // Signed-in users can look up rooms by code / id.
       allow read: if isSignedIn();
 
-      // Host controls room fields. Guest joins go through the joinRoom Cloud Function.
-      allow update: if isRoomHost(roomId);
+      // Host controls all room fields. Controllers may only issue playback commands.
+      allow update: if isRoomHost(roomId)
+        || (
+          canIssuePlaybackCommand(roomId)
+          && onlyPlaybackCommandChanged()
+          && isValidPlaybackCommand(request.resource.data.playbackCommand)
+        );
       allow delete: if false;
 
       match /members/{memberId} {
@@ -41,7 +78,16 @@ service cloud.firestore {
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.role == 'host';
 
-        allow update, delete: if isRoomHost(roomId);
+        // Host may promote/demote guests <-> controllers. Host role is immutable.
+        // Users cannot grant themselves controller permission.
+        allow update: if isRoomHost(roomId)
+          && resource.data.role in ['guest', 'controller']
+          && request.resource.data.role in ['guest', 'controller']
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
+
+        allow delete: if isRoomHost(roomId)
+          && resource.data.role != 'host';
       }
 
       match /queue/{queueItemId} {
@@ -52,6 +98,8 @@ service cloud.firestore {
           && request.resource.data.singerUserId == request.auth.uid
           && request.resource.data.status == 'queued';
 
+        // Queue advance / remove remains host-only. Controllers send playback
+        // commands; the host player device applies next/skip against the queue.
         allow update: if isRoomHost(roomId)
           || (
             isRoomMember(roomId)
