@@ -59,11 +59,17 @@ export function GuestRoomPage() {
 
   const memberRole = getMemberRole(user?.uid, room, members)
   useEffect(() => {
-    if (!room || !user) return
+    // Skip while leaving: membership removal flips memberRole and would
+    // otherwise call setActiveRoom again after clearActiveRoom().
+    if (!room || !user || isLeaving) return
     if (room.status === 'ended') {
       clearActiveRoom()
       return
     }
+    // Wait until we know membership; don't default a missing role to "guest"
+    // (that re-binds the session right after leaveRoom deletes the member).
+    if (!memberRole) return
+
     setActiveRoom({
       roomId: room.id,
       roomCode: room.roomCode,
@@ -82,6 +88,7 @@ export function GuestRoomPage() {
     room?.status,
     memberRole,
     user,
+    isLeaving,
     setActiveRoom,
     clearActiveRoom,
   ])
@@ -143,7 +150,7 @@ export function GuestRoomPage() {
       await leaveRoom(roomId)
       clearActiveRoom()
       toast.message('Left the room')
-      navigate('/home')
+      navigate('/home', { replace: true })
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to leave room',

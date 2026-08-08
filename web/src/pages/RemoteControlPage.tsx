@@ -72,6 +72,10 @@ export function RemoteControlPage() {
       clearActiveRoom()
       return
     }
+    // Don't default a missing role to "guest" — that can re-bind the
+    // session after the member doc is removed (e.g. leave from another tab).
+    if (!memberRole) return
+
     setActiveRoom({
       roomId: room.id,
       roomCode: room.roomCode,
