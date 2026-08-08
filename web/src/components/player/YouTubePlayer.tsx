@@ -6,8 +6,11 @@ import {
   useRef,
   useState,
 } from 'react'
+import { Maximize2, Minimize2, PanelBottomClose, PanelBottomOpen } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { loadYouTubeIframeApi, YTPlayerState } from '@/lib/youtube-iframe'
+import { cn } from '@/lib/utils'
 import type { QueueItem } from '@/types/queue'
 import type { PlaybackState } from '@/types/youtube'
 
@@ -22,11 +25,31 @@ type YouTubePlayerProps = {
   playbackState: PlaybackState
   onPlaybackStateChange?: (state: PlaybackState) => void
   onEnded?: () => void
+  isFullscreen?: boolean
+  onToggleFullscreen?: () => void
+  /** Use a taller fill layout on short landscape viewports. */
+  fillViewport?: boolean
+  showControlsToggle?: boolean
+  controlsVisible?: boolean
+  onToggleControls?: () => void
+  className?: string
 }
 
 export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
   function YouTubePlayer(
-    { song, playbackState, onPlaybackStateChange, onEnded },
+    {
+      song,
+      playbackState,
+      onPlaybackStateChange,
+      onEnded,
+      isFullscreen = false,
+      onToggleFullscreen,
+      fillViewport = false,
+      showControlsToggle = false,
+      controlsVisible = true,
+      onToggleControls,
+      className,
+    },
     ref,
   ) {
     const reactId = useId().replace(/:/g, '')
@@ -85,7 +108,10 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
             videoId: song.youtubeVideoId,
             playerVars: {
               autoplay: 1,
-              controls: 1,
+              // HostControls own playback — native UI steals focus/clicks.
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
               rel: 0,
               modestbranding: 1,
               playsinline: 1,
@@ -145,15 +171,57 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
       }
     }, [])
 
+    const shellClass = cn(
+      'relative isolate w-full max-w-full overflow-hidden border border-border',
+      isFullscreen || fillViewport
+        ? 'h-full min-h-0 flex-1 rounded-none border-0 bg-black'
+        : 'aspect-video rounded-md',
+      song ? 'bg-black' : 'bg-canvas-soft',
+      className,
+    )
+
+    const overlayButtons =
+      onToggleFullscreen != null || showControlsToggle ? (
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+          {showControlsToggle && onToggleControls ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="size-10 bg-background/90 shadow-sm backdrop-blur-sm"
+              aria-label={controlsVisible ? 'Hide controls' : 'Show controls'}
+              title={controlsVisible ? 'Hide controls' : 'Show controls'}
+              onClick={onToggleControls}
+            >
+              {controlsVisible ? <PanelBottomClose /> : <PanelBottomOpen />}
+            </Button>
+          ) : null}
+          {onToggleFullscreen != null ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="size-10 bg-background/90 shadow-sm backdrop-blur-sm"
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+              onClick={onToggleFullscreen}
+            >
+              {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+            </Button>
+          ) : null}
+        </div>
+      ) : null
+
     if (!song) {
       return (
-        <div className="relative aspect-video w-full max-w-full overflow-hidden rounded-md border border-border bg-canvas-soft">
+        <div className={shellClass}>
           <div className="flex size-full flex-col items-center justify-center gap-2 p-6 text-center">
             <p className="eyebrow-mono text-mute">Ready when you are</p>
             <p className="text-body">
               Press Play or Start when a song is in the queue.
             </p>
           </div>
+          {overlayButtons}
         </div>
       )
     }
@@ -161,10 +229,31 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     return (
       // Absolute fill keeps the YouTube iframe inside the 16:9 box on mobile;
       // otherwise the API iframe can overflow and cover content below.
-      <div className="relative isolate aspect-video w-full max-w-full overflow-hidden rounded-md border border-border bg-black">
+      <div className={shellClass}>
         <div className="absolute inset-0 [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0">
           <div id={containerId} className="h-full w-full" />
         </div>
+
+        {/* Keep clicks/focus on the page so Space / N / S / R keep working. */}
+        {isReady && !apiError ? (
+          <div
+            className="absolute inset-0 z-1"
+            aria-hidden="true"
+            onMouseDown={(event) => {
+              event.preventDefault()
+            }}
+            onClick={() => {
+              if (showControlsToggle && controlsVisible) {
+                onToggleControls?.()
+              }
+            }}
+            onDoubleClick={() => {
+              onToggleFullscreen?.()
+            }}
+          />
+        ) : null}
+
+        {overlayButtons}
 
         {!isReady && !apiError ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-canvas-soft/80">

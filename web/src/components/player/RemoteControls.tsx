@@ -34,8 +34,9 @@ export function RemoteControls({
   const locked = disabled || !playerOnline
   const canStart = hasUpcomingSong
   const canPlayPause = hasCurrentSong
-  const canNext = hasCurrentSong || hasUpcomingSong
-  const canSkip = hasCurrentSong
+  // Next/Start only when something is queued after (or instead of) the current song.
+  const canNext = hasUpcomingSong
+  const canSkip = hasCurrentSong && hasUpcomingSong
   const canRestart = hasCurrentSong
 
   const controlClass =

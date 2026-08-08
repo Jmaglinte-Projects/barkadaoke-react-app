@@ -36,11 +36,14 @@ import {
 import { useActiveRoom } from '@/hooks/useActiveRoom'
 import { useAuth } from '@/hooks/useAuth'
 import { useEnsureRoomMembership } from '@/hooks/useEnsureRoomMembership'
+import { useFullscreen } from '@/hooks/useFullscreen'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useQueue } from '@/hooks/useQueue'
 import { useRoom } from '@/hooks/useRoom'
 import { useRoomMembers } from '@/hooks/useRoomMembers'
 import { useSavedSongs } from '@/hooks/useSavedSongs'
 import { getDeviceId } from '@/lib/device-id'
+import { cn } from '@/lib/utils'
 import {
   getCurrentSong,
   getNextSong,
@@ -57,12 +60,23 @@ export function HostRoomPage() {
   const navigate = useNavigate()
   const { setActiveRoom, clearActiveRoom } = useActiveRoom()
   const playerRef = useRef<YouTubePlayerHandle>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const { isFullscreen, toggleFullscreen } = useFullscreen(stageRef)
+  const isCompactLandscape = useMediaQuery(
+    '(orientation: landscape) and (max-height: 500px)',
+  )
+  const [controlsVisible, setControlsVisible] = useState(true)
   const [showQr, setShowQr] = useState(true)
   const [isActing, setIsActing] = useState(false)
   const [addSongsOpen, setAddSongsOpen] = useState(false)
   const [rolePendingUserId, setRolePendingUserId] = useState<string | null>(
     null,
   )
+
+  useEffect(() => {
+    // Phones in landscape: give the video the screen; controls stay a tap away.
+    setControlsVisible(!isCompactLandscape)
+  }, [isCompactLandscape])
 
   const { isJoining, error: joinError } = useEnsureRoomMembership(roomId, user)
   const { room, isLoading: roomLoading, error: roomError } = useRoom(roomId)
@@ -171,8 +185,12 @@ export function HostRoomPage() {
       const nextSong = getNextSong(currentQueue)
       const hasCurrent = Boolean(currentRoom.currentQueueItemId)
 
-      if (!hasCurrent && !nextSong) {
-        toast.message('Queue is empty — add a song first')
+      if (!nextSong) {
+        toast.message(
+          hasCurrent
+            ? 'No more songs in the queue'
+            : 'Queue is empty — add a song first',
+        )
         return
       }
 
@@ -190,17 +208,11 @@ export function HostRoomPage() {
           currentRoom.currentQueueItemId,
           mode,
         )
-        if (nextSong) {
-          toast.success(
-            mode === 'skip'
-              ? `Skipped — up next: ${nextSong.singerName}`
-              : `Up next: ${nextSong.singerName}`,
-          )
-        } else {
-          toast.message(
-            mode === 'skip' ? 'Song skipped — queue finished' : 'Queue finished',
-          )
-        }
+        toast.success(
+          mode === 'skip'
+            ? `Skipped — up next: ${nextSong.singerName}`
+            : `Up next: ${nextSong.singerName}`,
+        )
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : 'Could not advance queue',
@@ -465,154 +477,214 @@ export function HostRoomPage() {
   }
 
   return (
-    <div className="min-h-svh bg-background">
-      <AppNav />
-      <RoomHeader room={room} />
+    <div
+      className={cn(
+        'min-h-svh bg-background',
+        isCompactLandscape && 'h-svh overflow-hidden',
+      )}
+    >
+      {isCompactLandscape ? null : (
+        <>
+          <AppNav />
+          <RoomHeader room={room} />
+        </>
+      )}
 
-      <div className="mx-auto grid max-w-7xl gap-4 overflow-x-hidden px-4 py-4 lg:grid-cols-[1fr_320px] lg:px-6">
-        <div className="min-w-0 space-y-4">
-          <YouTubePlayer
-            ref={playerRef}
-            song={current}
-            playbackState={room.playbackState}
-            onPlaybackStateChange={syncPlaybackState}
-            onEnded={handleEnded}
-          />
-
-          <HostControls
-            playbackState={room.playbackState}
-            disabled={isActing}
-            hasCurrentSong={Boolean(current)}
-            hasUpcomingSong={upcoming.length > 0}
-            onPlay={() => {
-              // No current song yet — start the first queued track.
-              if (!current) {
-                void handleAdvance('next')
-                return
-              }
-              playerRef.current?.play()
-              syncPlaybackState('playing')
-            }}
-            onPause={() => {
-              playerRef.current?.pause()
-              syncPlaybackState('paused')
-            }}
-            onRestart={() => {
-              playerRef.current?.restart()
-              syncPlaybackState('playing')
-              toast.message('Restarted current song')
-            }}
-            onNext={() => {
-              void handleAdvance('next')
-            }}
-            onSkip={() => {
-              void handleAdvance('skip')
-            }}
-          />
-
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
-            <CurrentSinger
+      <div
+        className={cn(
+          'mx-auto grid max-w-7xl gap-4 overflow-x-hidden px-4 py-4 lg:grid-cols-[1fr_320px] lg:px-6',
+          isCompactLandscape &&
+            'h-full max-w-none grid-cols-1 px-0 py-0 lg:grid-cols-1',
+        )}
+      >
+        <div
+          className={cn(
+            'min-w-0 space-y-4',
+            isCompactLandscape && 'flex h-full flex-col space-y-0',
+          )}
+        >
+          <div
+            ref={stageRef}
+            className={cn(
+              'relative space-y-4',
+              (isFullscreen || isCompactLandscape) &&
+                'flex h-full min-h-0 flex-col gap-0 space-y-0 bg-black',
+              isFullscreen && !isCompactLandscape && 'gap-3 bg-background p-3 sm:p-4',
+            )}
+          >
+            <YouTubePlayer
+              ref={playerRef}
               song={current}
-              isSaved={current ? isSaved(current.youtubeVideoId) : false}
-              bookmarkPending={
-                current != null && pendingVideoId === current.youtubeVideoId
-              }
-              onToggleBookmark={
-                current
-                  ? () => {
-                      void toggleQueueItemBookmark(current)
-                    }
-                  : undefined
-              }
-            />
-            <NextSinger song={next} />
-          </div>
-
-          <section className="pb-20">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="eyebrow-mono text-mute">Queue</p>
-                <p className="mt-1 font-mono text-sm text-body">
-                  {upcoming.length} upcoming
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="lg"
-                variant="outline"
-                className="h-11"
-                onClick={() => setAddSongsOpen(true)}
-              >
-                <ListPlus data-icon="inline-start" />
-                Add songs
-              </Button>
-            </div>
-            <QueueList
-              items={visibleQueue}
-              canRemoveAny
-              onRemove={handleRemove}
-              isSaved={isSaved}
-              pendingVideoId={pendingVideoId}
-              onToggleBookmark={(item) => {
-                void toggleQueueItemBookmark(item)
+              playbackState={room.playbackState}
+              onPlaybackStateChange={syncPlaybackState}
+              onEnded={handleEnded}
+              isFullscreen={isFullscreen}
+              fillViewport={isCompactLandscape && !isFullscreen}
+              showControlsToggle={isCompactLandscape}
+              controlsVisible={controlsVisible}
+              onToggleControls={() => {
+                setControlsVisible((value) => !value)
+              }}
+              onToggleFullscreen={() => {
+                void toggleFullscreen()
               }}
             />
-          </section>
+
+            <div
+              className={cn(
+                !controlsVisible && 'hidden',
+                isCompactLandscape
+                  ? 'absolute inset-x-0 bottom-0 z-30 p-2 sm:p-3'
+                  : isFullscreen && 'shrink-0',
+              )}
+            >
+              <HostControls
+                playbackState={room.playbackState}
+                disabled={isActing}
+                hasCurrentSong={Boolean(current)}
+                hasUpcomingSong={upcoming.length > 0}
+                isFullscreen={isFullscreen}
+                compact={isCompactLandscape}
+                onToggleFullscreen={() => {
+                  void toggleFullscreen()
+                }}
+                onPlay={() => {
+                  // No current song yet — start the first queued track.
+                  if (!current) {
+                    void handleAdvance('next')
+                    return
+                  }
+                  playerRef.current?.play()
+                  syncPlaybackState('playing')
+                }}
+                onPause={() => {
+                  playerRef.current?.pause()
+                  syncPlaybackState('paused')
+                }}
+                onRestart={() => {
+                  playerRef.current?.restart()
+                  syncPlaybackState('playing')
+                  toast.message('Restarted current song')
+                }}
+                onNext={() => {
+                  void handleAdvance('next')
+                }}
+                onSkip={() => {
+                  void handleAdvance('skip')
+                }}
+              />
+            </div>
+          </div>
+
+          {isCompactLandscape ? null : (
+            <>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                <CurrentSinger
+                  song={current}
+                  isSaved={current ? isSaved(current.youtubeVideoId) : false}
+                  bookmarkPending={
+                    current != null && pendingVideoId === current.youtubeVideoId
+                  }
+                  onToggleBookmark={
+                    current
+                      ? () => {
+                          void toggleQueueItemBookmark(current)
+                        }
+                      : undefined
+                  }
+                />
+                <NextSinger song={next} />
+              </div>
+
+              <section className="pb-20">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="eyebrow-mono text-mute">Queue</p>
+                    <p className="mt-1 font-mono text-sm text-body">
+                      {upcoming.length} upcoming
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => setAddSongsOpen(true)}
+                  >
+                    <ListPlus data-icon="inline-start" />
+                    Add songs
+                  </Button>
+                </div>
+                <QueueList
+                  items={visibleQueue}
+                  canRemoveAny
+                  onRemove={handleRemove}
+                  isSaved={isSaved}
+                  pendingVideoId={pendingVideoId}
+                  onToggleBookmark={(item) => {
+                    void toggleQueueItemBookmark(item)
+                  }}
+                />
+              </section>
+            </>
+          )}
         </div>
 
-        <aside className="min-w-0 space-y-4">
-          <Button
-            type="button"
-            size="lg"
-            className="hidden h-12 w-full text-base lg:inline-flex"
-            onClick={() => setAddSongsOpen(true)}
-          >
-            <ListPlus data-icon="inline-start" />
-            Add songs to queue
-            <kbd className="ml-auto rounded border border-primary-foreground/30 px-1.5 py-0.5 font-mono text-[10px]">
-              /
-            </kbd>
-          </Button>
-
-          <div className="flex items-center justify-between">
-            <p className="eyebrow-mono text-mute">Invite</p>
+        {isCompactLandscape ? null : (
+          <aside className="min-w-0 space-y-4">
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowQr((value) => !value)}
+              type="button"
+              size="lg"
+              className="hidden h-12 w-full text-base lg:inline-flex"
+              onClick={() => setAddSongsOpen(true)}
             >
-              {showQr ? 'Hide QR' : 'Show QR'}
+              <ListPlus data-icon="inline-start" />
+              Add songs to queue
+              <kbd className="ml-auto rounded border border-primary-foreground/30 px-1.5 py-0.5 font-mono text-[10px]">
+                /
+              </kbd>
             </Button>
-          </div>
-          {showQr ? <RoomQRCode roomCode={room.roomCode} /> : null}
-          <MemberList
-            members={members}
-            canManageRoles
-            rolePendingUserId={rolePendingUserId}
-            onChangeRole={(memberUserId, role) => {
-              void handleChangeRole(memberUserId, role)
-            }}
-          />
-          <Button variant="outline" className="w-full" asChild>
-            <Link to={`/room/${room.id}/remote`}>Open remote control</Link>
-          </Button>
-          <Button variant="outline" className="w-full" asChild>
-            <Link to={`/room/${room.id}`}>Open guest view</Link>
-          </Button>
-          <Button
-            variant="destructive"
-            className="w-full"
-            disabled={isActing}
-            onClick={() => {
-              void handleEndRoom()
-            }}
-          >
-            End room
-          </Button>
-        </aside>
+
+            <div className="flex items-center justify-between">
+              <p className="eyebrow-mono text-mute">Invite</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowQr((value) => !value)}
+              >
+                {showQr ? 'Hide QR' : 'Show QR'}
+              </Button>
+            </div>
+            {showQr ? <RoomQRCode roomCode={room.roomCode} /> : null}
+            <MemberList
+              members={members}
+              canManageRoles
+              rolePendingUserId={rolePendingUserId}
+              onChangeRole={(memberUserId, role) => {
+                void handleChangeRole(memberUserId, role)
+              }}
+            />
+            <Button variant="outline" className="w-full" asChild>
+              <Link to={`/room/${room.id}/remote`}>Open remote control</Link>
+            </Button>
+            <Button variant="outline" className="w-full" asChild>
+              <Link to={`/room/${room.id}`}>Open guest view</Link>
+            </Button>
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={isActing}
+              onClick={() => {
+                void handleEndRoom()
+              }}
+            >
+              End room
+            </Button>
+          </aside>
+        )}
       </div>
 
-      {!addSongsOpen ? (
+      {!addSongsOpen && !isCompactLandscape ? (
         <HostAddSongsFab
           upcomingCount={myUpcomingCount}
           onClick={() => setAddSongsOpen(true)}
