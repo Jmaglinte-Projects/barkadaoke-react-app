@@ -19,7 +19,8 @@ export function SongSearch({
 }: SongSearchProps) {
   const [query, setQuery] = useState('')
   const fieldRef = useRef<HTMLDivElement>(null)
-  const { results, isSearching, error, usedFallback } = useYouTubeSearch(query)
+  const { results, isSearching, error, usedFallback, searchMode } =
+    useYouTubeSearch(query)
 
   useEffect(() => {
     if (!autoFocus || disabled) return
@@ -47,6 +48,12 @@ export function SongSearch({
         <p className="text-xs text-mute">
           Showing demo results — deploy the `searchVideos` Cloud Function for
           live YouTube search.
+        </p>
+      ) : null}
+
+      {!usedFallback && searchMode === 'catalog-fallback' && query.trim() ? (
+        <p className="text-xs text-mute">
+          Showing songs already available in Barkadaoke.
         </p>
       ) : null}
 

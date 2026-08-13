@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { searchKaraokeVideos } from '@/firebase/youtube'
-import type { SongSearchResult } from '@/types/youtube'
+import type { SearchMode, SongSearchResult } from '@/types/youtube'
 
 const DEBOUNCE_MS = 550
 
@@ -10,6 +10,10 @@ export function useYouTubeSearch(query: string) {
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usedFallback, setUsedFallback] = useState(false)
+  const [searchMode, setSearchMode] = useState<SearchMode | 'mock' | null>(
+    null,
+  )
+  const [youtubeSearchSucceeded, setYoutubeSearchSucceeded] = useState(false)
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -18,6 +22,8 @@ export function useYouTubeSearch(query: string) {
       setIsSearching(false)
       setError(null)
       setUsedFallback(false)
+      setSearchMode(null)
+      setYoutubeSearchSucceeded(false)
       return
     }
 
@@ -31,11 +37,15 @@ export function useYouTubeSearch(query: string) {
           if (cancelled) return
           setResults(response.results)
           setUsedFallback(response.usedFallback)
+          setSearchMode(response.searchMode)
+          setYoutubeSearchSucceeded(response.youtubeSearchSucceeded)
         })
         .catch((err: unknown) => {
           if (cancelled) return
           setResults([])
           setUsedFallback(false)
+          setSearchMode(null)
+          setYoutubeSearchSucceeded(false)
           setError(err instanceof Error ? err.message : 'Search failed')
         })
         .finally(() => {
@@ -49,5 +59,12 @@ export function useYouTubeSearch(query: string) {
     }
   }, [query])
 
-  return { results, isSearching, error, usedFallback }
+  return {
+    results,
+    isSearching,
+    error,
+    usedFallback,
+    searchMode,
+    youtubeSearchSucceeded,
+  }
 }
