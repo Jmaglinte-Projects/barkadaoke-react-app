@@ -36,6 +36,7 @@ export function HostAddSongsSheet({
   const titleId = useId()
   const searchPanelRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<AddTab>('search')
+  const [isAddingSong, setIsAddingSong] = useState(false)
   const {
     songs: savedSongs,
     isLoading: savedLoading,
@@ -44,9 +45,13 @@ export function HostAddSongsSheet({
   } = useSavedSongs()
 
   const atLimit = myUpcomingCount >= MAX_UPCOMING_SONGS_PER_USER
+  const addDisabled = atLimit || isAddingSong
 
   useEffect(() => {
-    if (!open) setTab('search')
+    if (!open) {
+      setTab('search')
+      setIsAddingSong(false)
+    }
   }, [open])
 
   useEffect(() => {
@@ -59,7 +64,13 @@ export function HostAddSongsSheet({
   }, [open, tab])
 
   async function handleAdd(song: SongSearchResult) {
-    await onAddSong(song)
+    if (isAddingSong) return
+    setIsAddingSong(true)
+    try {
+      await onAddSong(song)
+    } finally {
+      setIsAddingSong(false)
+    }
   }
 
   async function handleAddSaved(song: SavedSong) {
@@ -119,7 +130,8 @@ export function HostAddSongsSheet({
             <div ref={searchPanelRef}>
               <SongSearch
                 onAddSong={handleAdd}
-                disabled={atLimit}
+                disabled={addDisabled}
+                isAdding={isAddingSong}
                 autoFocus={open}
               />
             </div>
@@ -129,7 +141,8 @@ export function HostAddSongsSheet({
             <SavedSongsList
               songs={savedSongs}
               emptyLabel="No saved songs yet. Bookmark tracks from the queue anytime."
-              addDisabled={atLimit}
+              addDisabled={addDisabled}
+              isAdding={isAddingSong}
               pendingVideoId={pendingVideoId}
               onAddToQueue={(song) => {
                 void handleAddSaved(song)

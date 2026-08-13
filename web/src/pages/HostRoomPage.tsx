@@ -494,7 +494,7 @@ export function HostRoomPage() {
         className={cn(
           'mx-auto grid max-w-7xl gap-4 overflow-x-hidden px-4 py-4 lg:grid-cols-[1fr_320px] lg:px-6',
           isCompactLandscape &&
-            'h-full max-w-none grid-cols-1 px-0 py-0 lg:grid-cols-1',
+          'h-full max-w-none grid-cols-1 px-0 py-0 lg:grid-cols-1',
         )}
       >
         <div
@@ -508,7 +508,7 @@ export function HostRoomPage() {
             className={cn(
               'relative space-y-4',
               (isFullscreen || isCompactLandscape) &&
-                'flex h-full min-h-0 flex-col gap-0 space-y-0 bg-black',
+              'flex h-full min-h-0 flex-col gap-0 space-y-0 bg-black',
               isFullscreen && !isCompactLandscape && 'gap-3 bg-background p-3 sm:p-4',
             )}
           >
@@ -588,15 +588,15 @@ export function HostRoomPage() {
                   onToggleBookmark={
                     current
                       ? () => {
-                          void toggleQueueItemBookmark(current)
-                        }
+                        void toggleQueueItemBookmark(current)
+                      }
                       : undefined
                   }
                 />
                 <NextSinger song={next} />
               </div>
 
-              <section className="pb-20">
+              <section className="lg:pb-20">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="eyebrow-mono text-mute">Queue</p>

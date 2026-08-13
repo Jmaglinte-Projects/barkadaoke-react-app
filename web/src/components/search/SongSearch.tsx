@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 
 import { SongSearchResultRow } from '@/components/search/SongSearchResult'
+import { BusyOverlay } from '@/components/ui/busy-overlay'
 import { Input } from '@/components/ui/input'
 import { useYouTubeSearch } from '@/hooks/useYouTubeSearch'
 import type { SongSearchResult } from '@/types/youtube'
@@ -9,12 +10,14 @@ import type { SongSearchResult } from '@/types/youtube'
 type SongSearchProps = {
   onAddSong: (result: SongSearchResult) => void
   disabled?: boolean
+  isAdding?: boolean
   autoFocus?: boolean
 }
 
 export function SongSearch({
   onAddSong,
   disabled = false,
+  isAdding = false,
   autoFocus = false,
 }: SongSearchProps) {
   const [query, setQuery] = useState('')
@@ -31,7 +34,8 @@ export function SongSearch({
   }, [autoFocus, disabled])
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
+      {isAdding ? <BusyOverlay label="Adding to queue…" /> : null}
       <div ref={fieldRef} className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-mute" />
         <Input
