@@ -43,6 +43,7 @@ export function GuestRoomPage() {
   const { setActiveRoom, clearActiveRoom } = useActiveRoom()
   const [tab, setTab] = useState<GuestTab>('now')
   const [isLeaving, setIsLeaving] = useState(false)
+  const [isAddingSong, setIsAddingSong] = useState(false)
 
   const { isJoining, error: joinError } = useEnsureRoomMembership(roomId, user)
   const { room, isLoading: roomLoading, error: roomError } = useRoom(roomId)
@@ -160,13 +161,16 @@ export function GuestRoomPage() {
   }
 
   async function handleAddSong(result: SongSearchResult) {
-    if (!roomId || !user) return
+    if (!roomId || !user || isAddingSong) return
+    setIsAddingSong(true)
     try {
       await addSongToQueue(roomId, user, result, queue)
       toast.success('Song added to queue')
       setTab('queue')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add song')
+    } finally {
+      setIsAddingSong(false)
     }
   }
 
@@ -275,7 +279,11 @@ export function GuestRoomPage() {
                 Wait until one starts or remove one to add another.
               </p>
             ) : null}
-            <SongSearch onAddSong={handleAddSong} disabled={atUpcomingLimit} />
+            <SongSearch
+              onAddSong={handleAddSong}
+              disabled={atUpcomingLimit || isAddingSong}
+              isAdding={isAddingSong}
+            />
           </div>
         ) : null}
 
@@ -302,7 +310,8 @@ export function GuestRoomPage() {
               <SavedSongsList
                 songs={savedSongs}
                 emptyLabel="Bookmark a song from Now Playing or the queue to build your collection."
-                addDisabled={atUpcomingLimit}
+                addDisabled={atUpcomingLimit || isAddingSong}
+                isAdding={isAddingSong}
                 pendingVideoId={pendingVideoId}
                 onAddToQueue={(song) => {
                   void handleAddSavedSong(song)
