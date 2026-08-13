@@ -3,7 +3,6 @@ import { Link, Navigate } from 'react-router-dom'
 import { Mic2, QrCode, Users } from 'lucide-react'
 
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
-import { AppNav } from '@/components/layout/AppNav'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -12,7 +11,7 @@ export function LandingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
+      <div className="flex min-h-[50svh] items-center justify-center">
         <p className="text-sm text-body">Loading…</p>
       </div>
     )
@@ -23,58 +22,54 @@ export function LandingPage() {
   }
 
   return (
-    <div className="min-h-svh bg-background">
-      <AppNav />
+    <main>
+      <section className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-20">
+        <p className="eyebrow-mono text-primary">Shared karaoke queue</p>
+        <h1 className="display-xl mt-4 max-w-3xl">
+          Everyone can queue. Nobody fights over the remote.
+        </h1>
+        <p className="mt-6 max-w-xl text-lg leading-7 text-body">
+          Host on the TV. Guests join from their phones. Search, queue, and
+          take turns — without interrupting the current singer.
+        </p>
 
-      <main>
-        <section className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-20">
-          <p className="eyebrow-mono text-primary">Shared karaoke queue</p>
-          <h1 className="display-xl mt-4 max-w-3xl">
-            Everyone can queue. Nobody fights over the remote.
-          </h1>
-          <p className="mt-6 max-w-xl text-lg leading-7 text-body">
-            Host on the TV. Guests join from their phones. Search, queue, and
-            take turns — without interrupting the current singer.
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <GoogleSignInButton />
-            <Button variant="outline" size="lg" asChild>
-              <Link to="/join">Enter room code</Link>
-            </Button>
-          </div>
-        </section>
-
-        <div className="mx-auto max-w-6xl px-4 md:px-8">
-          <div className="dashed-divider" />
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <GoogleSignInButton />
+          <Button variant="outline" size="lg" asChild>
+            <Link to="/join">Enter room code</Link>
+          </Button>
         </div>
+      </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-16">
-          <p className="eyebrow-mono text-mute">How it works</p>
-          <h2 className="display-lg mt-3 text-ink-strong">
-            Separate song selection from playback.
-          </h2>
+      <div className="mx-auto max-w-6xl px-4 md:px-8">
+        <div className="dashed-divider" />
+      </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            <FeatureCard
-              icon={<Mic2 className="size-5 text-primary" />}
-              title="Host on TV"
-              body="Create a room, show the QR code, and control YouTube playback from one device."
-            />
-            <FeatureCard
-              icon={<QrCode className="size-5 text-primary" />}
-              title="Join by code"
-              body="Guests scan the QR or type a short room code like K8P4DZ on their phones."
-            />
-            <FeatureCard
-              icon={<Users className="size-5 text-primary" />}
-              title="Shared queue"
-              body="Everyone sees who is singing now, who is next, and can add songs without interruption."
-            />
-          </div>
-        </section>
-      </main>
-    </div>
+      <section className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-16">
+        <p className="eyebrow-mono text-mute">How it works</p>
+        <h2 className="display-lg mt-3 text-ink-strong">
+          Separate song selection from playback.
+        </h2>
+
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <FeatureCard
+            icon={<Mic2 className="size-5 text-primary" />}
+            title="Host on TV"
+            body="Create a room, show the QR code, and control YouTube playback from one device."
+          />
+          <FeatureCard
+            icon={<QrCode className="size-5 text-primary" />}
+            title="Join by code"
+            body="Guests scan the QR or type a short room code like K8P4DZ on their phones."
+          />
+          <FeatureCard
+            icon={<Users className="size-5 text-primary" />}
+            title="Shared queue"
+            body="Everyone sees who is singing now, who is next, and can add songs without interruption."
+          />
+        </div>
+      </section>
+    </main>
   )
 }
 

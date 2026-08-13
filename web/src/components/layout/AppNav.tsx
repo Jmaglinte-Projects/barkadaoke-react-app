@@ -10,14 +10,17 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 export function AppNav() {
-  const { user, isAuthenticated, isMockAuth, signOut } = useAuth()
-  const { activeRoom, roomPath } = useActiveRoom()
+  const { user, isAuthenticated, isLoading, isMockAuth, signOut } = useAuth()
+  const { activeRoom, roomPath, isLoading: isRoomLoading } = useActiveRoom()
   const location = useLocation()
   const inRoomRoute = location.pathname.startsWith('/room/')
+  // Until both auth and the active-room lookup settle we can't tell whether the
+  // nav should show the room chip or the default links.
+  const isSessionResolving = isLoading || (isAuthenticated && isRoomLoading)
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-2 md:h-14 md:flex-row md:items-center md:gap-3 md:py-0 md:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-2 md:h-14 md:flex-row md:items-center md:justify-between md:gap-3 md:py-0 md:px-8">
         <div className="flex items-center justify-between gap-3 md:contents">
           <Link
             to={isAuthenticated ? '/home' : '/'}
@@ -37,7 +40,12 @@ export function AppNav() {
                 Demo auth
               </span>
             ) : null}
-            {isAuthenticated && user ? (
+            {isLoading ? (
+              <div
+                className="h-8 w-20 animate-pulse rounded-md bg-canvas-soft"
+                aria-hidden
+              />
+            ) : isAuthenticated && user ? (
               <>
                 <div className="flex items-center gap-2">
                   <Avatar size="sm">
@@ -71,9 +79,14 @@ export function AppNav() {
           </div>
         </div>
 
-        {isAuthenticated ? (
+        {isSessionResolving || isAuthenticated ? (
           <nav className="flex min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto md:justify-center md:gap-2 md:order-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {activeRoom && roomPath ? (
+            {isSessionResolving ? (
+              <div
+                className="h-8 w-44 animate-pulse rounded-md bg-canvas-soft"
+                aria-hidden
+              />
+            ) : activeRoom && roomPath ? (
               <>
                 {!inRoomRoute ? (
                   <Button asChild size="sm" className="max-w-[220px] shrink-0">

@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
-import { AppNav } from '@/components/layout/AppNav'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -83,7 +82,7 @@ export function JoinRoomPage() {
 
   if (isLoading || activeLoading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
+      <div className="flex min-h-[50svh] items-center justify-center">
         <p className="text-sm text-body">Checking session…</p>
       </div>
     )
@@ -95,7 +94,7 @@ export function JoinRoomPage() {
 
   if (paramCode && isAuthenticated && isJoining && !error) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
+      <div className="flex min-h-[50svh] items-center justify-center">
         <p className="text-sm text-body">Joining room…</p>
       </div>
     )
@@ -144,61 +143,55 @@ export function JoinRoomPage() {
   }
 
   return (
-    <div className="min-h-svh bg-background">
-      <AppNav />
+    <main className="mx-auto max-w-lg px-4 py-10 md:px-8">
+      <p className="eyebrow-mono text-mute">Join session</p>
+      <h1 className="display-lg mt-2 text-ink-strong">Enter room code</h1>
+      <p className="mt-3 text-body">
+        Ask the host for the code on the TV, or scan their QR.
+      </p>
 
-      <main className="mx-auto max-w-lg px-4 py-10 md:px-8">
-        <p className="eyebrow-mono text-mute">Join session</p>
-        <h1 className="display-lg mt-2 text-ink-strong">Enter room code</h1>
-        <p className="mt-3 text-body">
-          Ask the host for the code on the TV, or scan their QR.
-        </p>
+      <form onSubmit={handleJoin} className="hairline-card mt-8 space-y-5 p-6">
+        <div className="space-y-2">
+          <Label htmlFor="room-code">Room code</Label>
+          <Input
+            id="room-code"
+            value={code}
+            onChange={(event) => {
+              setCode(normalizeRoomCode(event.target.value))
+              setError('')
+            }}
+            placeholder="K8P4DZ"
+            className="h-12 bg-canvas-soft text-center font-mono text-lg tracking-[0.35em]"
+            maxLength={8}
+            autoFocus
+            disabled={isJoining}
+          />
+        </div>
 
-        <form onSubmit={handleJoin} className="hairline-card mt-8 space-y-5 p-6">
-          <div className="space-y-2">
-            <Label htmlFor="room-code">Room code</Label>
-            <Input
-              id="room-code"
-              value={code}
-              onChange={(event) => {
-                setCode(normalizeRoomCode(event.target.value))
-                setError('')
-              }}
-              placeholder="K8P4DZ"
-              className="h-12 bg-canvas-soft text-center font-mono text-lg tracking-[0.35em]"
-              maxLength={8}
-              autoFocus
-              disabled={isJoining}
-            />
+        {error ? (
+          <p className="whitespace-pre-line text-sm text-destructive">{error}</p>
+        ) : null}
+
+        {!isAuthenticated ? (
+          <div className="space-y-3">
+            <p className="text-sm text-body">Sign in to join the room.</p>
+            <GoogleSignInButton className="w-full" />
           </div>
-
-          {error ? (
-            <p className="whitespace-pre-line text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
-
-          {!isAuthenticated ? (
-            <div className="space-y-3">
-              <p className="text-sm text-body">Sign in to join the room.</p>
-              <GoogleSignInButton className="w-full" />
-            </div>
-          ) : (
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              disabled={isJoining}
-            >
-              {isJoining ? 'Joining…' : 'Join room'}
-            </Button>
-          )}
-
-          <Button type="button" variant="ghost" className="w-full" asChild>
-            <Link to="/home">Back to home</Link>
+        ) : (
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={isJoining}
+          >
+            {isJoining ? 'Joining…' : 'Join room'}
           </Button>
-        </form>
-      </main>
-    </div>
+        )}
+
+        <Button type="button" variant="ghost" className="w-full" asChild>
+          <Link to="/home">Back to home</Link>
+        </Button>
+      </form>
+    </main>
   )
 }

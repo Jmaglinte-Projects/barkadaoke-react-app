@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { AppNav } from '@/components/layout/AppNav'
 import { RemoteControls } from '@/components/player/RemoteControls'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -182,11 +181,9 @@ export function RemoteControlPage() {
   }
 
   return (
-    <div className="min-h-svh bg-background">
-      <AppNav />
-
+    <div>
       <header className="border-b border-border px-4 py-4">
-        <div className="mx-auto flex max-w-lg flex-col gap-3">
+        <div className="mx-auto flex max-w-lg flex-col gap-3 lg:px-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="eyebrow-mono text-primary">Barkadaoke</p>

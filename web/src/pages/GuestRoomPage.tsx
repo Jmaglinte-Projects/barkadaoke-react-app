@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Bookmark, ListMusic, Radio, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { AppNav } from '@/components/layout/AppNav'
 import { CurrentSinger } from '@/components/queue/CurrentSinger'
 import { NextSinger } from '@/components/queue/NextSinger'
 import { QueueList } from '@/components/queue/QueueList'
@@ -194,8 +193,7 @@ export function GuestRoomPage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-background pb-20">
-      <AppNav />
+    <div className="flex flex-col pb-20">
       <RoomHeader room={room} />
 
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
