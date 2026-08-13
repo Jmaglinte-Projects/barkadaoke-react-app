@@ -11,6 +11,10 @@ import {
 } from 'firebase/firestore'
 
 import { getDb } from '@/firebase/config'
+import {
+  getCallableErrorMessage,
+  upsertCatalogSong,
+} from '@/firebase/catalog'
 import { mapSavedSong } from '@/firebase/mappers'
 import type { BookmarkableSong, SavedSong } from '@/types/saved-song'
 import type { QueueItem } from '@/types/queue'
@@ -34,6 +38,8 @@ export function savedSongToSearchResult(song: SavedSong): SongSearchResult {
     title: song.title,
     thumbnailUrl: song.thumbnailUrl,
     channelTitle: song.channelTitle || 'Saved',
+    source: 'youtube',
+    resultSource: 'catalog',
   }
 }
 
@@ -46,11 +52,42 @@ export async function saveSong(
     throw new Error('Missing video id.')
   }
 
+  // Refresh metadata + catalog before bookmarking so deleted videos are caught.
+  let title = song.title.trim() || 'Untitled'
+  let thumbnailUrl = song.thumbnailUrl || ''
+  let channelTitle = song.channelTitle?.trim() || ''
+
+  try {
+    const catalog = await upsertCatalogSong({
+      videoId,
+      title,
+      thumbnailUrl,
+      channelTitle,
+    })
+    title = catalog.title
+    thumbnailUrl = catalog.thumbnailUrl
+    channelTitle = catalog.channelTitle
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: string }).code)
+        : ''
+    if (code.includes('not-found')) {
+      throw new Error(
+        getCallableErrorMessage(
+          error,
+          'This video is no longer available on YouTube.',
+        ),
+      )
+    }
+    // Undeployed callable / missing API key: bookmark with provided metadata.
+  }
+
   await setDoc(doc(savedSongsCollection(userId), videoId), {
     videoId,
-    title: song.title.trim() || 'Untitled',
-    thumbnailUrl: song.thumbnailUrl || '',
-    channelTitle: song.channelTitle?.trim() || '',
+    title,
+    thumbnailUrl,
+    channelTitle,
     savedAt: serverTimestamp(),
   })
 }

@@ -112,6 +112,14 @@ service cloud.firestore {
       }
     }
 
+    // Shared karaoke catalog — readable by signed-in users.
+    // Trusted fields (usageCount, source, timestamps, availability) are written
+    // only by Cloud Functions via the Admin SDK (upsertCatalogSongCallable).
+    match /songs/{songId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // Personal song bookmarks — private to the signed-in owner.
     match /users/{userId} {
       allow read, write: if false;

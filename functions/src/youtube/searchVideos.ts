@@ -2,14 +2,17 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
 import { logger } from 'firebase-functions'
 
-const youtubeApiKey = defineSecret('YOUTUBE_API_KEY')
+import {
+  LOCAL_RESULT_THRESHOLD,
+  searchCatalog,
+} from '../catalog/searchCatalog'
+import type {
+  SearchMode,
+  SearchVideosResponse,
+  SongSearchResult,
+} from '../catalog/types'
 
-type SongSearchResult = {
-  videoId: string
-  title: string
-  thumbnailUrl: string
-  channelTitle: string
-}
+const youtubeApiKey = defineSecret('YOUTUBE_API_KEY')
 
 type SearchRequest = {
   query?: string
@@ -35,19 +38,99 @@ function buildKaraokeQuery(raw: string): string {
   return `${trimmed} karaoke`
 }
 
+function mergeResults(
+  local: SongSearchResult[],
+  remote: SongSearchResult[],
+): SongSearchResult[] {
+  const byId = new Map<string, SongSearchResult>()
+  // Prefer catalog copies when the same videoId appears in both sources.
+  for (const item of local) {
+    byId.set(item.videoId, item)
+  }
+  for (const item of remote) {
+    if (!byId.has(item.videoId)) {
+      byId.set(item.videoId, item)
+    }
+  }
+  return [...byId.values()]
+}
+
+async function searchYouTube(
+  query: string,
+  maxResults: number,
+  apiKey: string,
+): Promise<SongSearchResult[]> {
+  const url = new URL('https://www.googleapis.com/youtube/v3/search')
+  url.searchParams.set('part', 'snippet')
+  url.searchParams.set('type', 'video')
+  url.searchParams.set('videoEmbeddable', 'true')
+  url.searchParams.set('maxResults', String(maxResults))
+  url.searchParams.set('q', query)
+  url.searchParams.set('key', apiKey)
+
+  let response: Response
+  try {
+    response = await fetch(url)
+  } catch (error) {
+    logger.error('YouTube search network error', error)
+    throw new HttpsError('internal', 'Failed to reach YouTube search.')
+  }
+
+  if (!response.ok) {
+    const body = await response.text()
+    logger.error('YouTube search failed', {
+      status: response.status,
+      body,
+    })
+    throw new HttpsError(
+      'internal',
+      'YouTube search failed. Check the API key and quota.',
+    )
+  }
+
+  const json = (await response.json()) as { items?: YouTubeSearchItem[] }
+  const results: SongSearchResult[] = []
+  for (const item of json.items ?? []) {
+    const videoId = item.id?.videoId
+    if (!videoId) continue
+    results.push({
+      videoId,
+      title: item.snippet?.title ?? 'Untitled',
+      thumbnailUrl:
+        item.snippet?.thumbnails?.medium?.url ??
+        item.snippet?.thumbnails?.default?.url ??
+        '',
+      channelTitle: item.snippet?.channelTitle ?? 'YouTube',
+      source: 'youtube',
+      resultSource: 'youtube',
+    })
+  }
+  return results
+}
+
+/**
+ * Local-first karaoke search:
+ * 1. Search Firestore catalog
+ * 2. If >= LOCAL_RESULT_THRESHOLD useful hits → return catalog only
+ * 3. Else call YouTube Search, merge + dedupe (prefer catalog)
+ * 4. If YouTube fails but catalog has hits → catalog-fallback
+ *
+ * Does not write to the catalog. Catalog population happens on select
+ * via upsertCatalogSongCallable.
+ */
 export const searchVideos = onCall(
   {
     secrets: [youtubeApiKey],
     cors: true,
   },
-  async (request): Promise<{ results: SongSearchResult[] }> => {
+  async (request): Promise<SearchVideosResponse> => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in to search songs.')
     }
 
     const data = (request.data ?? {}) as SearchRequest
-    const query = buildKaraokeQuery(String(data.query ?? ''))
-    if (query.length < 2) {
+    const rawQuery = String(data.query ?? '').trim()
+    if (rawQuery.length < 2) {
       throw new HttpsError(
         'invalid-argument',
         'Enter at least 2 characters to search.',
@@ -55,60 +138,60 @@ export const searchVideos = onCall(
     }
 
     const maxResults = Math.min(Math.max(Number(data.maxResults) || 8, 1), 15)
-    const apiKey = youtubeApiKey.value()
+    const localResults = await searchCatalog(rawQuery, maxResults)
 
+    if (localResults.length >= LOCAL_RESULT_THRESHOLD) {
+      return {
+        results: localResults.slice(0, maxResults),
+        searchMode: 'catalog',
+        youtubeSearchSucceeded: false,
+      }
+    }
+
+    const apiKey = youtubeApiKey.value()
     if (!apiKey) {
+      if (localResults.length > 0) {
+        return {
+          results: localResults,
+          searchMode: 'catalog-fallback',
+          youtubeSearchSucceeded: false,
+        }
+      }
       throw new HttpsError(
         'failed-precondition',
         'YouTube API key is not configured on the server.',
       )
     }
 
-    const url = new URL('https://www.googleapis.com/youtube/v3/search')
-    url.searchParams.set('part', 'snippet')
-    url.searchParams.set('type', 'video')
-    url.searchParams.set('videoEmbeddable', 'true')
-    url.searchParams.set('maxResults', String(maxResults))
-    url.searchParams.set('q', query)
-    url.searchParams.set('key', apiKey)
+    const youtubeQuery = buildKaraokeQuery(rawQuery)
 
-    let response: Response
     try {
-      response = await fetch(url)
-    } catch (error) {
-      logger.error('YouTube search network error', error)
-      throw new HttpsError('internal', 'Failed to reach YouTube search.')
-    }
-
-    if (!response.ok) {
-      const body = await response.text()
-      logger.error('YouTube search failed', {
-        status: response.status,
-        body,
-      })
-      throw new HttpsError(
-        'internal',
-        'YouTube search failed. Check the API key and quota.',
+      const youtubeResults = await searchYouTube(
+        youtubeQuery,
+        maxResults,
+        apiKey,
       )
-    }
+      const results = mergeResults(localResults, youtubeResults).slice(
+        0,
+        maxResults,
+      )
 
-    const json = (await response.json()) as { items?: YouTubeSearchItem[] }
-    const results: SongSearchResult[] = (json.items ?? [])
-      .map((item) => {
-        const videoId = item.id?.videoId
-        if (!videoId) return null
+      return {
+        results,
+        // Reported even when local was empty — catalog was still checked first.
+        searchMode: 'catalog+youtube' satisfies SearchMode,
+        youtubeSearchSucceeded: true,
+      }
+    } catch (error) {
+      if (localResults.length > 0) {
+        logger.warn('YouTube search failed; returning catalog results', error)
         return {
-          videoId,
-          title: item.snippet?.title ?? 'Untitled',
-          thumbnailUrl:
-            item.snippet?.thumbnails?.medium?.url ??
-            item.snippet?.thumbnails?.default?.url ??
-            '',
-          channelTitle: item.snippet?.channelTitle ?? 'YouTube',
-        } satisfies SongSearchResult
-      })
-      .filter((item): item is SongSearchResult => item !== null)
-
-    return { results }
+          results: localResults,
+          searchMode: 'catalog-fallback',
+          youtubeSearchSucceeded: false,
+        }
+      }
+      throw error
+    }
   },
 )

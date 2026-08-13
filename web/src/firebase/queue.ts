@@ -13,6 +13,10 @@ import {
 } from 'firebase/firestore'
 
 import { getDb } from '@/firebase/config'
+import {
+  getCallableErrorMessage,
+  upsertCatalogSong,
+} from '@/firebase/catalog'
 import { mapQueueItem } from '@/firebase/mappers'
 import { getNextSong, getUpcomingQueue } from '@/lib/queue'
 import {
@@ -64,11 +68,39 @@ export async function addSongToQueue(
     )
   }
 
+  // Select-time catalog upsert refreshes metadata and rejects deleted videos.
+  let title = song.title
+  let thumbnailUrl = song.thumbnailUrl
+  try {
+    const catalog = await upsertCatalogSong({
+      videoId: song.videoId,
+      title: song.title,
+      thumbnailUrl: song.thumbnailUrl,
+      channelTitle: song.channelTitle,
+    })
+    title = catalog.title
+    thumbnailUrl = catalog.thumbnailUrl
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: string }).code)
+        : ''
+    if (code.includes('not-found')) {
+      throw new Error(
+        getCallableErrorMessage(
+          error,
+          'This video is no longer available on YouTube.',
+        ),
+      )
+    }
+    // Undeployed callable / missing API key: queue with search metadata.
+  }
+
   const order = await getNextOrder(roomId)
   await addDoc(collection(getDb(), 'rooms', roomId, 'queue'), {
     youtubeVideoId: song.videoId,
-    title: song.title,
-    thumbnailUrl: song.thumbnailUrl,
+    title,
+    thumbnailUrl,
     singerUserId: user.uid,
     singerName: user.displayName,
     singerPhotoURL: user.photoURL ?? null,

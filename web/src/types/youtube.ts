@@ -3,7 +3,11 @@ export type SongSearchResult = {
   title: string
   thumbnailUrl: string
   channelTitle: string
+  source: 'youtube'
+  resultSource: 'catalog' | 'youtube'
 }
+
+export type SearchMode = 'catalog' | 'catalog+youtube' | 'catalog-fallback'
 
 export type PlaybackState =
   | 'idle'
