@@ -7,7 +7,6 @@ import {
   HostAddSongsFab,
   HostAddSongsSheet,
 } from '@/components/host/HostAddSongsSheet'
-import { AppNav } from '@/components/layout/AppNav'
 import { HostControls } from '@/components/player/HostControls'
 import {
   YouTubePlayer,
@@ -479,16 +478,10 @@ export function HostRoomPage() {
   return (
     <div
       className={cn(
-        'min-h-svh bg-background',
         isCompactLandscape && 'h-svh overflow-hidden',
       )}
     >
-      {isCompactLandscape ? null : (
-        <>
-          <AppNav />
-          <RoomHeader room={room} />
-        </>
-      )}
+      {isCompactLandscape ? null : <RoomHeader room={room} />}
 
       <div
         className={cn(

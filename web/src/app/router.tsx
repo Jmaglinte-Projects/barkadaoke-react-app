@@ -1,6 +1,7 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, useRoutes } from 'react-router-dom'
 
-import { AuthGate } from '@/components/auth/AuthGate'
+import { AppLayout } from '@/components/layout/AppLayout'
+import { AuthLayout } from '@/components/layout/AuthLayout'
 import { CreateRoomPage } from '@/pages/CreateRoomPage'
 import { GuestRoomPage } from '@/pages/GuestRoomPage'
 import { HomePage } from '@/pages/HomePage'
@@ -10,65 +11,40 @@ import { LandingPage } from '@/pages/LandingPage'
 import { RemoteControlPage } from '@/pages/RemoteControlPage'
 import { SavedSongsPage } from '@/pages/SavedSongsPage'
 
+function AppRoutes() {
+  return useRoutes([
+    {
+      element: <AppLayout />,
+      children: [
+        { path: '/', element: <LandingPage /> },
+        { path: '/join', element: <JoinRoomPage /> },
+        { path: '/join/:roomCode', element: <JoinRoomPage /> },
+        {
+          element: <AuthLayout />,
+          children: [
+            { path: '/home', element: <HomePage /> },
+            { path: '/create', element: <CreateRoomPage /> },
+            { path: '/saved', element: <SavedSongsPage /> },
+            { path: '/room/:roomId/host', element: <HostRoomPage /> },
+          ],
+        },
+        {
+          element: <AuthLayout redirectTo="/join" />,
+          children: [
+            { path: '/room/:roomId', element: <GuestRoomPage /> },
+            { path: '/room/:roomId/remote', element: <RemoteControlPage /> },
+          ],
+        },
+      ],
+    },
+    { path: '*', element: <Navigate to="/" replace /> },
+  ])
+}
+
 export function AppRouter() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/join" element={<JoinRoomPage />} />
-        <Route path="/join/:roomCode" element={<JoinRoomPage />} />
-
-        <Route
-          path="/home"
-          element={
-            <AuthGate>
-              <HomePage />
-            </AuthGate>
-          }
-        />
-        <Route
-          path="/create"
-          element={
-            <AuthGate>
-              <CreateRoomPage />
-            </AuthGate>
-          }
-        />
-        <Route
-          path="/saved"
-          element={
-            <AuthGate>
-              <SavedSongsPage />
-            </AuthGate>
-          }
-        />
-        <Route
-          path="/room/:roomId"
-          element={
-            <AuthGate redirectTo="/join">
-              <GuestRoomPage />
-            </AuthGate>
-          }
-        />
-        <Route
-          path="/room/:roomId/host"
-          element={
-            <AuthGate>
-              <HostRoomPage />
-            </AuthGate>
-          }
-        />
-        <Route
-          path="/room/:roomId/remote"
-          element={
-            <AuthGate redirectTo="/join">
-              <RemoteControlPage />
-            </AuthGate>
-          }
-        />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   )
 }
