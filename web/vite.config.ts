@@ -12,7 +12,18 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      injectRegister: "auto",
+      registerType: "prompt",
+      injectRegister: false,
+      includeAssets: [
+        "favicon.svg",
+        "assets/img/apple-touch-icon-180x180.png",
+      ],
+      workbox: {
+        globPatterns: [
+          "**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}",
+        ],
+        navigateFallback: "/index.html",
+      },
       manifest: {
         name: "Barkadaoke",
         short_name: "Barkadaoke",
