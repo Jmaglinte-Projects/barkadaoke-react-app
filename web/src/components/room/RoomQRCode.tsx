@@ -1,19 +1,14 @@
 import { QRCodeSVG } from 'qrcode.react'
 
+import { getRoomJoinUrl } from '@/lib/room-code'
+
 type RoomQRCodeProps = {
   roomCode: string
   size?: number
 }
 
 export function RoomQRCode({ roomCode, size = 160 }: RoomQRCodeProps) {
-  const appUrl = (
-    import.meta.env.VITE_APP_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '')
-  ).replace(/\/$/, '')
-
-  const joinUrl = appUrl
-    ? `${appUrl}/join/${roomCode}`
-    : `/join/${roomCode}`
+  const joinUrl = getRoomJoinUrl(roomCode)
 
   return (
     <div className="hairline-card flex flex-col items-center gap-4 p-6">
