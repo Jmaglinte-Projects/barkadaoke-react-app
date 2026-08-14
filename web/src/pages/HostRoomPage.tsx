@@ -435,7 +435,7 @@ export function HostRoomPage() {
 
   async function handleCopyInviteLink() {
     try {
-      await navigator.clipboard.writeText(getRoomJoinUrl(room.roomCode));
+      await navigator.clipboard.writeText(getRoomJoinUrl(room?.roomCode ?? ""));
       toast.success("Invite link copied");
     } catch {
       toast.error("Could not copy invite link");
