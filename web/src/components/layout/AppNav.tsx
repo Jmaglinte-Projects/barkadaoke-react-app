@@ -20,7 +20,7 @@ export function AppNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-2 md:h-14 md:flex-row md:items-center md:justify-between md:gap-3 md:py-0 md:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 md:h-14 md:flex-row md:items-center md:justify-between md:gap-3 md:py-0 md:px-8">
         <div className="flex items-center justify-between gap-3 md:contents">
           <Link
             to={isAuthenticated ? '/home' : '/'}
@@ -98,19 +98,17 @@ export function AppNav() {
                     </Link>
                   </Button>
                 ) : (
-                  <div className="flex items-center gap-2 rounded-md border border-border bg-canvas-soft px-3 py-1.5">
+                  <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-canvas-soft px-3 py-1.5">
                     <span className="size-1.5 shrink-0 rounded-full bg-primary" />
-                    <span className="font-mono text-xs tracking-wider text-ink-strong">
-                      {activeRoom.roomCode}
-                    </span>
-                    <span className="hidden max-w-[140px] truncate text-xs text-mute sm:inline">
+                    <span className="truncate text-xs font-semibold uppercase tracking-wide text-ink-strong">
                       {activeRoom.name}
+                    </span>
+                    <span className="text-mute">·</span>
+                    <span className="shrink-0 font-mono text-xs tracking-widest text-ink-strong">
+                      {activeRoom.roomCode}
                     </span>
                   </div>
                 )}
-                <span className="hidden shrink-0 text-xs text-mute lg:inline">
-                  End or leave room to create/join another
-                </span>
               </>
             ) : (
               <>

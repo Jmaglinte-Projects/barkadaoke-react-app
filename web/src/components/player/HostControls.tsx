@@ -5,7 +5,6 @@ import {
   Pause,
   Play,
   RotateCcw,
-  SkipForward,
   StepForward,
 } from 'lucide-react'
 
@@ -74,7 +73,12 @@ export function HostControls({
 
       const key = event.key
 
-      if (key === ' ' || key === 'k' || key === 'K' || key === 'MediaPlayPause') {
+      if (
+        key === ' ' ||
+        key === 'k' ||
+        key === 'K' ||
+        key === 'MediaPlayPause'
+      ) {
         if (disabled) return
         if (isPlaying && canPlayPause) {
           event.preventDefault()
@@ -141,35 +145,25 @@ export function HostControls({
 
   const controlClass = compact
     ? 'h-10 min-w-0 flex-1 justify-center gap-1.5 px-2 text-sm focus-visible:ring-4'
-    : 'h-12 w-full justify-between gap-3 px-4 text-base sm:w-auto sm:min-w-[8.5rem] lg:h-14 lg:min-w-[9.5rem] lg:text-base focus-visible:ring-4'
+    : 'h-10 min-w-[7.5rem] justify-between gap-2 px-3 text-sm focus-visible:ring-4 sm:min-w-[8.5rem]'
 
   return (
     <div
       className={cn(
         compact
           ? 'rounded-md border border-border/80 bg-background/95 px-2 py-2 shadow-lg backdrop-blur-sm'
-          : 'rounded-md border border-border bg-canvas-soft/40 px-3 py-3 sm:px-4 sm:py-4',
+          : null,
         className,
       )}
     >
       {compact ? null : (
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p className="eyebrow-mono text-mute">Host controls</p>
-            <p className="mt-1 text-xs text-body sm:text-sm">
-              Use these buttons or keyboard shortcuts — the video itself ignores
-              clicks so focus stays here.
-            </p>
-          </div>
-          <div className="hidden flex-wrap gap-1.5 md:flex">
-            <ShortcutBadge label="Space" detail="Play / Pause" />
-            <ShortcutBadge label="N / →" detail="Next" />
-            <ShortcutBadge label="S" detail="Skip" />
-            <ShortcutBadge label="R" detail="Restart" />
-            {onToggleFullscreen ? (
-              <ShortcutBadge label="F" detail="Fullscreen" />
-            ) : null}
-          </div>
+        <div className="mb-2 hidden flex-wrap gap-1.5 sm:flex">
+          <ShortcutBadge label="Space" detail="Play / Pause" />
+          <ShortcutBadge label="N / →" detail="Next" />
+          <ShortcutBadge label="R" detail="Restart" />
+          {onToggleFullscreen ? (
+            <ShortcutBadge label="F" detail="Fullscreen" />
+          ) : null}
         </div>
       )}
 
@@ -177,7 +171,7 @@ export function HostControls({
         className={cn(
           compact
             ? 'flex items-center gap-1.5'
-            : 'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center',
+            : 'flex flex-wrap items-center gap-2',
         )}
         role="toolbar"
         aria-label="Playback controls"
@@ -185,12 +179,13 @@ export function HostControls({
         {isPlaying && hasCurrentSong ? (
           <Button
             type="button"
-            size={compact ? 'default' : 'lg'}
+            size={compact ? 'default' : 'sm'}
             className={controlClass}
             disabled={disabled}
+            title="Pause (Space)"
             onClick={onPause}
           >
-            <span className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5">
               <Pause data-icon="inline-start" />
               Pause
             </span>
@@ -199,12 +194,13 @@ export function HostControls({
         ) : (
           <Button
             type="button"
-            size={compact ? 'default' : 'lg'}
+            size={compact ? 'default' : 'sm'}
             className={controlClass}
             disabled={disabled || !(canPlayPause || canStart)}
+            title="Play (Space)"
             onClick={onPlay}
           >
-            <span className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5">
               <Play data-icon="inline-start" />
               Play
             </span>
@@ -214,12 +210,13 @@ export function HostControls({
 
         <Button
           type="button"
-          size={compact ? 'default' : 'lg'}
+          size={compact ? 'default' : 'sm'}
           className={controlClass}
           disabled={disabled || !canNext}
+          title={hasCurrentSong ? 'Next (N)' : 'Start (N)'}
           onClick={onNext}
         >
-          <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5">
             <StepForward data-icon="inline-start" />
             {hasCurrentSong ? 'Next' : 'Start'}
           </span>
@@ -229,42 +226,29 @@ export function HostControls({
         <Button
           type="button"
           variant="outline"
-          size={compact ? 'default' : 'lg'}
+          size={compact ? 'default' : 'sm'}
           className={cn(controlClass, !compact && 'bg-background')}
           disabled={disabled || !canRestart}
+          title="Restart (R)"
           onClick={onRestart}
         >
-          <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5">
             <RotateCcw data-icon="inline-start" />
             {compact ? 'Replay' : 'Restart'}
           </span>
           {compact ? null : <Kbd className="hidden sm:inline">R</Kbd>}
         </Button>
 
-        <Button
-          type="button"
-          variant="outline"
-          size={compact ? 'default' : 'lg'}
-          className={cn(controlClass, !compact && 'bg-background')}
-          disabled={disabled || !canSkip}
-          onClick={onSkip}
-        >
-          <span className="inline-flex items-center gap-2">
-            <SkipForward data-icon="inline-start" />
-            Skip
-          </span>
-          {compact ? null : <Kbd className="hidden sm:inline">S</Kbd>}
-        </Button>
-
         {onToggleFullscreen && !compact ? (
           <Button
             type="button"
             variant="outline"
-            size="lg"
+            size="sm"
             className={cn(controlClass, 'bg-background')}
+            title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
             onClick={onToggleFullscreen}
           >
-            <span className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5">
               {isFullscreen ? (
                 <Minimize2 data-icon="inline-start" />
               ) : (

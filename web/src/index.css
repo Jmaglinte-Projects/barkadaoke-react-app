@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/inter';
+@import url('https://fonts.googleapis.com/css2?family=Cookie&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
@@ -10,6 +11,7 @@
   --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
   --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     monospace;
+  --font-cookie: Cookie, cursive;
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -175,5 +177,9 @@
 
   .green-divider {
     border-top: 2px solid var(--primary);
+  }
+
+  .font-cookie {
+    font-family: var(--font-cookie);
   }
 }

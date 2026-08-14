@@ -1,10 +1,10 @@
-import { Badge } from '@/components/ui/badge'
-import type { KaraokeRoom } from '@/types/room'
+import { Badge } from "@/components/ui/badge";
+import type { KaraokeRoom } from "@/types/room";
 
 type RoomHeaderProps = {
-  room: KaraokeRoom
-  showCode?: boolean
-}
+  room: KaraokeRoom;
+  showCode?: boolean;
+};
 
 export function RoomHeader({ room, showCode = true }: RoomHeaderProps) {
   return (
@@ -16,7 +16,7 @@ export function RoomHeader({ room, showCode = true }: RoomHeaderProps) {
 
       <div className="flex items-center gap-2">
         <Badge
-          variant={room.status === 'active' ? 'default' : 'outline'}
+          variant={room.status === "active" ? "default" : "outline"}
           className="rounded-full"
         >
           {room.status}
@@ -28,5 +28,5 @@ export function RoomHeader({ room, showCode = true }: RoomHeaderProps) {
         ) : null}
       </div>
     </div>
-  )
+  );
 }
