@@ -2,7 +2,11 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 
-export const MAX_ROOM_MEMBERS = 5
+import {
+  isPositiveInteger,
+  readRoomSettings,
+  type RoomSettings,
+} from './limits'
 
 type JoinRoomRequest = {
   roomId?: string
@@ -16,11 +20,15 @@ type JoinRoomResponse = {
   hostUserId: string
   status: string
   memberCount: number
+  settings: RoomSettings
   alreadyMember: boolean
 }
 
 function normalizeRoomCode(code: string): string {
-  return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return code
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
 }
 
 export const joinRoom = onCall(
@@ -32,9 +40,7 @@ export const joinRoom = onCall(
 
     const uid = request.auth.uid
     const displayName =
-      request.auth.token.name ||
-      request.auth.token.email ||
-      'Guest'
+      request.auth.token.name || request.auth.token.email || 'Guest'
     const photoURL =
       typeof request.auth.token.picture === 'string'
         ? request.auth.token.picture
@@ -63,10 +69,7 @@ export const joinRoom = onCall(
 
       const match = snapshot.docs[0]
       if (!match) {
-        throw new HttpsError(
-          'not-found',
-          'No active room found for that code.',
-        )
+        throw new HttpsError('not-found', 'No active room found for that code.')
       }
       roomId = match.id
     }
@@ -84,10 +87,7 @@ export const joinRoom = onCall(
 
         const room = roomSnap.data()!
         if (room.status === 'ended') {
-          throw new HttpsError(
-            'failed-precondition',
-            'This room has ended.',
-          )
+          throw new HttpsError('failed-precondition', 'This room has ended.')
         }
 
         const existingMember = await tx.get(memberRef)
@@ -99,19 +99,25 @@ export const joinRoom = onCall(
             hostUserId: String(room.hostUserId ?? ''),
             status: String(room.status ?? 'active'),
             memberCount: Number(room.memberCount ?? 1),
+            settings: readRoomSettings(room.settings),
             alreadyMember: true,
           } satisfies JoinRoomResponse
         }
 
         // Count current members inside the transaction to avoid race conditions.
         const membersSnap = await tx.get(membersRef)
-        if (membersSnap.size >= MAX_ROOM_MEMBERS) {
+        const { memberLimit } = readRoomSettings(room.settings)
+        if (membersSnap.size >= memberLimit) {
           throw new HttpsError(
             'resource-exhausted',
-            'This room is full.\nMaximum of 5 users are allowed in a room.',
+            `This room is full. Maximum of ${memberLimit} participant${memberLimit === 1 ? '' : 's'}, including the host.`,
           )
         }
 
+        const allowance = await tx.get(
+          roomRef.collection('songAllowances').doc(uid),
+        )
+        const override = allowance.data()?.limit
         const role = room.hostUserId === uid ? 'host' : 'guest'
         const nextCount = membersSnap.size + 1
 
@@ -120,6 +126,9 @@ export const joinRoom = onCall(
           displayName,
           photoURL,
           role,
+          ...(override === null || isPositiveInteger(override)
+            ? { songLimitOverride: override }
+            : {}),
           joinedAt: FieldValue.serverTimestamp(),
         })
 
@@ -135,6 +144,7 @@ export const joinRoom = onCall(
           hostUserId: String(room.hostUserId ?? ''),
           status: String(room.status ?? 'active'),
           memberCount: nextCount,
+          settings: readRoomSettings(room.settings),
           alreadyMember: false,
         } satisfies JoinRoomResponse
       })

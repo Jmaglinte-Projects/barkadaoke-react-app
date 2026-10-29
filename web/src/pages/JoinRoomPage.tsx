@@ -169,7 +169,9 @@ export function JoinRoomPage() {
         </div>
 
         {error ? (
-          <p className="whitespace-pre-line text-sm text-destructive">{error}</p>
+          <p className="whitespace-pre-line text-sm text-destructive">
+            {error}
+          </p>
         ) : null}
 
         {!isAuthenticated ? (

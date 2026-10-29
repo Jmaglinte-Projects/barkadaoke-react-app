@@ -17,12 +17,15 @@ import { httpsCallable } from 'firebase/functions'
 import { getDb, getFirebaseFunctions } from '@/firebase/config'
 import { mapMember, mapRoom } from '@/firebase/mappers'
 import { roleSortRank } from '@/lib/playback'
+import { DEFAULT_ROOM_SETTINGS, readRoomSettings } from '@/lib/room-limits'
 import { generateRoomCode, normalizeRoomCode } from '@/lib/room-code'
 import type {
   AssignableMemberRole,
   KaraokeRoom,
   PlaybackCommandType,
   RoomMember,
+  RoomSettings,
+  SongLimit,
 } from '@/types/room'
 import type { UserProfile } from '@/types/user'
 import type { PlaybackState } from '@/types/youtube'
@@ -34,6 +37,7 @@ type JoinRoomResponse = {
   hostUserId: string
   status: string
   memberCount: number
+  settings?: unknown
   alreadyMember: boolean
 }
 
@@ -41,7 +45,9 @@ function getCallableErrorMessage(error: unknown, fallback: string): string {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = String((error as { message: unknown }).message)
     // Firebase prefixes some messages like "Firebase: ..." — keep the useful part.
-    const cleaned = message.replace(/^Firebase:\s*/i, '').replace(/\s*\([^)]*\)\s*$/, '')
+    const cleaned = message
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/\s*\([^)]*\)\s*$/, '')
     if (cleaned.trim()) return cleaned.trim()
   }
   return fallback
@@ -112,6 +118,7 @@ export async function createRoom(
     playbackCommand: null,
     playerLastSeenAt: null,
     playerDeviceId: null,
+    settings: DEFAULT_ROOM_SETTINGS,
     memberCount: 1,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -136,6 +143,7 @@ export async function createRoom(
     playbackCommand: null,
     playerLastSeenAt: null,
     playerDeviceId: null,
+    settings: DEFAULT_ROOM_SETTINGS,
     memberCount: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -168,7 +176,7 @@ export async function getRoom(roomId: string): Promise<KaraokeRoom | null> {
   return mapRoom(snap.id, snap.data())
 }
 
-/** Trusted join via Cloud Function (transaction-safe 5-member cap). */
+/** Trusted join via Cloud Function (transaction-safe room capacity). */
 export async function joinRoom(
   roomId: string,
   _user: UserProfile,
@@ -192,6 +200,7 @@ export async function joinRoom(
       playbackCommand: null,
       playerLastSeenAt: null,
       playerDeviceId: null,
+      settings: readRoomSettings(data.settings),
       memberCount: data.memberCount,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -231,6 +240,7 @@ export async function joinRoomByCode(
       playbackCommand: null,
       playerLastSeenAt: null,
       playerDeviceId: null,
+      settings: readRoomSettings(data.settings),
       memberCount: data.memberCount,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -242,7 +252,10 @@ export async function joinRoomByCode(
   }
 }
 
-export async function endRoom(roomId: string, hostUserId: string): Promise<void> {
+export async function endRoom(
+  roomId: string,
+  hostUserId: string,
+): Promise<void> {
   const room = await getRoom(roomId)
   if (!room) {
     throw new Error('Room not found.')
@@ -391,4 +404,21 @@ export function subscribeToRoomMembers(
     },
     (error) => onError?.(error),
   )
+}
+
+export async function updateRoomSettings(
+  roomId: string,
+  settings: RoomSettings,
+  memberSongLimits: { userId: string; limit: SongLimit | 'default' }[],
+): Promise<void> {
+  try {
+    await httpsCallable(
+      getFirebaseFunctions(),
+      'updateRoomSettings',
+    )({ roomId, settings, memberSongLimits })
+  } catch (error) {
+    throw new Error(
+      getCallableErrorMessage(error, 'Could not save room settings.'),
+    )
+  }
 }

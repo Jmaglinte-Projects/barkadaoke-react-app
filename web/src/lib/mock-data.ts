@@ -1,3 +1,4 @@
+import { DEFAULT_ROOM_SETTINGS } from '@/lib/room-limits'
 import type { QueueItem } from '@/types/queue'
 import type { KaraokeRoom, RoomMember } from '@/types/room'
 import type { UserProfile } from '@/types/user'
@@ -21,6 +22,7 @@ export const MOCK_ROOM: KaraokeRoom = {
   playbackCommand: null,
   playerLastSeenAt: null,
   playerDeviceId: null,
+  settings: DEFAULT_ROOM_SETTINGS,
   memberCount: 4,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

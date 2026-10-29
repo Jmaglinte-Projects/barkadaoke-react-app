@@ -8,7 +8,10 @@ export function generateRoomCode(length = 6): string {
 }
 
 export function normalizeRoomCode(code: string): string {
-  return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return code
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
 }
 
 export function getRoomJoinUrl(roomCode: string): string {

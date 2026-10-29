@@ -1,10 +1,4 @@
-import {
-  Pause,
-  Play,
-  RotateCcw,
-  SkipForward,
-  StepForward,
-} from 'lucide-react'
+import { Pause, Play, RotateCcw, SkipForward, StepForward } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

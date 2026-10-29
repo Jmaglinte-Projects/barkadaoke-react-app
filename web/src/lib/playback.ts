@@ -26,10 +26,7 @@ export function getMemberRole(
   return members.find((entry) => entry.userId === userId)?.role ?? null
 }
 
-export type PlayerConnectionStatus =
-  | 'connected'
-  | 'reconnecting'
-  | 'offline'
+export type PlayerConnectionStatus = 'connected' | 'reconnecting' | 'offline'
 
 export function getPlayerConnectionStatus(
   lastSeenAt: string | null | undefined,

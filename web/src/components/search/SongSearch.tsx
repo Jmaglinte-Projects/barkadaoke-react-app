@@ -26,12 +26,12 @@ export function SongSearch({
     useYouTubeSearch(query)
 
   useEffect(() => {
-    if (!autoFocus || disabled) return
+    if (!autoFocus || isAdding) return
     const timer = window.setTimeout(() => {
       fieldRef.current?.querySelector('input')?.focus()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [autoFocus, disabled])
+  }, [autoFocus, isAdding])
 
   return (
     <div className="relative space-y-4">
@@ -43,7 +43,7 @@ export function SongSearch({
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search karaoke songs…"
           className="h-11 bg-canvas-soft pl-10"
-          disabled={disabled}
+          disabled={isAdding}
           autoFocus={autoFocus}
         />
       </div>
@@ -68,7 +68,9 @@ export function SongSearch({
           ) : error ? (
             <p className="py-6 text-center text-sm text-destructive">{error}</p>
           ) : results.length === 0 ? (
-            <p className="py-6 text-center text-sm text-body">No results found.</p>
+            <p className="py-6 text-center text-sm text-body">
+              No results found.
+            </p>
           ) : (
             <ul>
               {results.map((result) => (

@@ -1,16 +1,17 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
-@import '@fontsource-variable/inter';
-@import url('https://fonts.googleapis.com/css2?family=Cookie&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import url("https://fonts.googleapis.com/css2?family=Cookie&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-landing-accent: #00d6a0;
   --font-heading: var(--font-sans);
-  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
-  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    monospace;
+  --font-sans: "Inter Variable", Inter, system-ui, -apple-system, sans-serif;
+  --font-mono:
+    SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --font-cookie: Cookie, cursive;
 
   --color-sidebar-ring: var(--sidebar-ring);
@@ -112,7 +113,9 @@
 
   html {
     @apply font-sans antialiased;
-    font-feature-settings: 'calt' 1, 'rlig' 1;
+    font-feature-settings:
+      "calt" 1,
+      "rlig" 1;
     color-scheme: dark;
   }
 
@@ -181,5 +184,11 @@
 
   .font-cookie {
     font-family: var(--font-cookie);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-landing]) {
+    scroll-behavior: smooth;
   }
 }

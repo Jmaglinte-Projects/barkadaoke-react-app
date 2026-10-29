@@ -1,5 +1,3 @@
-export const MAX_UPCOMING_SONGS_PER_USER = 3
-
 export type QueueItemStatus =
   | 'queued'
   | 'playing'

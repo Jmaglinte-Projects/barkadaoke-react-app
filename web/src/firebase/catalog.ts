@@ -41,7 +41,10 @@ export async function upsertCatalogSong(
   return result.data
 }
 
-export function getCallableErrorMessage(error: unknown, fallback: string): string {
+export function getCallableErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = String((error as { message?: string }).message ?? '')
     if (message) {

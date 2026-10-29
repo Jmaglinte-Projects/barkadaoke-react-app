@@ -18,11 +18,7 @@ import {
   getPlayerConnectionStatus,
   isPlayerOnline,
 } from '@/lib/playback'
-import {
-  getCurrentSong,
-  getNextSong,
-  getUpcomingQueue,
-} from '@/lib/queue'
+import { getCurrentSong, getNextSong, getUpcomingQueue } from '@/lib/queue'
 import { cn } from '@/lib/utils'
 import type { PlaybackCommandType } from '@/types/room'
 import type { PlaybackState } from '@/types/youtube'
@@ -162,7 +158,9 @@ export function RemoteControlPage() {
   async function handleCommand(type: PlaybackCommandType) {
     if (!roomId || !user) return
     if (!playerOnline) {
-      toast.message('No player connected — keep the host player view open on the TV/desktop')
+      toast.message(
+        'No player connected — keep the host player view open on the TV/desktop',
+      )
       return
     }
     setPendingCommand(type)
@@ -195,9 +193,7 @@ export function RemoteControlPage() {
               </p>
             </div>
             <Badge
-              variant={
-                connectionStatus === 'connected' ? 'default' : 'outline'
-              }
+              variant={connectionStatus === 'connected' ? 'default' : 'outline'}
               className="shrink-0 rounded-full"
             >
               <span
@@ -213,7 +209,9 @@ export function RemoteControlPage() {
               {connectionLabel}
             </Badge>
           </div>
-          <p className="text-xs text-mute">Remote control — no video on this device</p>
+          <p className="text-xs text-mute">
+            Remote control — no video on this device
+          </p>
         </div>
       </header>
 
@@ -242,7 +240,9 @@ export function RemoteControlPage() {
               </div>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-body">Waiting for the first song…</p>
+            <p className="mt-3 text-sm text-body">
+              Waiting for the first song…
+            </p>
           )}
         </section>
 

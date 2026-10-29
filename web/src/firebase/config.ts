@@ -1,7 +1,15 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
-import { getAuth, type Auth } from 'firebase/auth'
-import { getFirestore, type Firestore } from 'firebase/firestore'
-import { getFunctions, type Functions } from 'firebase/functions'
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth'
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  type Firestore,
+} from 'firebase/firestore'
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+  type Functions,
+} from 'firebase/functions'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,6 +26,10 @@ export const isFirebaseConfigured = Boolean(
     firebaseConfig.projectId &&
     firebaseConfig.appId,
 )
+
+// Emulator routing is opt-in and cannot be enabled in a production build.
+const useEmulators =
+  import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true'
 
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
@@ -41,6 +53,10 @@ export function getFirebaseApp(): FirebaseApp {
 export function getFirebaseAuth(): Auth {
   if (!auth) {
     auth = getAuth(getFirebaseApp())
+    if (useEmulators)
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099', {
+        disableWarnings: true,
+      })
   }
 
   return auth
@@ -49,6 +65,7 @@ export function getFirebaseAuth(): Auth {
 export function getDb(): Firestore {
   if (!db) {
     db = getFirestore(getFirebaseApp())
+    if (useEmulators) connectFirestoreEmulator(db, '127.0.0.1', 8085)
   }
 
   return db
@@ -57,6 +74,7 @@ export function getDb(): Firestore {
 export function getFirebaseFunctions(): Functions {
   if (!functions) {
     functions = getFunctions(getFirebaseApp(), 'asia-southeast1')
+    if (useEmulators) connectFunctionsEmulator(functions, '127.0.0.1', 5002)
   }
 
   return functions

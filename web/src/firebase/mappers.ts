@@ -1,5 +1,6 @@
 import type { DocumentData, Timestamp } from 'firebase/firestore'
 
+import { isPositiveInteger, readRoomSettings } from '@/lib/room-limits'
 import type { QueueItem } from '@/types/queue'
 import type {
   KaraokeRoom,
@@ -65,12 +66,14 @@ export function mapRoom(id: string, data: DocumentData): KaraokeRoom {
       typeof data.currentQueueItemId === 'string'
         ? data.currentQueueItemId
         : null,
-    playbackState: (data.playbackState as KaraokeRoom['playbackState']) ?? 'idle',
+    playbackState:
+      (data.playbackState as KaraokeRoom['playbackState']) ?? 'idle',
     playbackCommand: mapPlaybackCommand(data.playbackCommand),
     playerLastSeenAt:
       typeof data.playerLastSeenAt === 'string' ? data.playerLastSeenAt : null,
     playerDeviceId:
       typeof data.playerDeviceId === 'string' ? data.playerDeviceId : null,
+    settings: readRoomSettings(data.settings),
     memberCount: Number(data.memberCount ?? 0),
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
@@ -81,9 +84,13 @@ export function mapMember(id: string, data: DocumentData): RoomMember {
   return {
     userId: String(data.userId ?? id),
     displayName: String(data.displayName ?? 'Guest'),
-    photoURL:
-      typeof data.photoURL === 'string' ? data.photoURL : undefined,
+    photoURL: typeof data.photoURL === 'string' ? data.photoURL : undefined,
     role: mapRoomRole(data.role),
+    songLimitOverride:
+      data.songLimitOverride === null ||
+      isPositiveInteger(data.songLimitOverride)
+        ? data.songLimitOverride
+        : undefined,
     joinedAt: toIso(data.joinedAt),
   }
 }
@@ -97,9 +104,7 @@ export function mapQueueItem(id: string, data: DocumentData): QueueItem {
     singerUserId: String(data.singerUserId ?? ''),
     singerName: String(data.singerName ?? 'Singer'),
     singerPhotoURL:
-      typeof data.singerPhotoURL === 'string'
-        ? data.singerPhotoURL
-        : undefined,
+      typeof data.singerPhotoURL === 'string' ? data.singerPhotoURL : undefined,
     status: (data.status as QueueItem['status']) ?? 'queued',
     order: Number(data.order ?? 0),
     createdAt: toIso(data.createdAt),

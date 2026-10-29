@@ -15,7 +15,10 @@ export function PwaUpdatePrompt() {
   const { needRefresh, dismissUpdate, applyUpdate } = usePwaUpdate()
 
   return (
-    <Dialog open={needRefresh} onOpenChange={(open) => !open && dismissUpdate()}>
+    <Dialog
+      open={needRefresh}
+      onOpenChange={(open) => !open && dismissUpdate()}
+    >
       <DialogContent
         showCloseButton={false}
         onPointerDownOutside={(event) => event.preventDefault()}
