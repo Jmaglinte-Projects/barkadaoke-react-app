@@ -10,7 +10,8 @@ export function AppLayout() {
   const isCompactLandscape = useMediaQuery(
     '(orientation: landscape) and (max-height: 500px)',
   )
-  const hideNav = HOST_ROOM_PATH.test(pathname) && isCompactLandscape
+  const hideNav =
+    pathname === '/' || (HOST_ROOM_PATH.test(pathname) && isCompactLandscape)
 
   return (
     <div className="min-h-svh bg-background">

@@ -21,6 +21,19 @@ npm install
 npm run dev
 ```
 
+## Formatting and styling
+
+Use Biome for formatting the web app:
+
+```bash
+npm run format
+npm run format:check
+```
+
+The Biome configuration supports Tailwind CSS v4 directives. Keep styling in
+Tailwind utility classes, reuse shared components and theme tokens, and reserve
+custom CSS for rules utilities cannot express cleanly. Oxlint remains the linter.
+
 ## Firebase Auth setup
 
 1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com).

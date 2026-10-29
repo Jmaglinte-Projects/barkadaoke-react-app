@@ -41,7 +41,9 @@ function getCallableErrorMessage(error: unknown, fallback: string): string {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = String((error as { message: unknown }).message)
     // Firebase prefixes some messages like "Firebase: ..." — keep the useful part.
-    const cleaned = message.replace(/^Firebase:\s*/i, '').replace(/\s*\([^)]*\)\s*$/, '')
+    const cleaned = message
+      .replace(/^Firebase:\s*/i, '')
+      .replace(/\s*\([^)]*\)\s*$/, '')
     if (cleaned.trim()) return cleaned.trim()
   }
   return fallback
@@ -242,7 +244,10 @@ export async function joinRoomByCode(
   }
 }
 
-export async function endRoom(roomId: string, hostUserId: string): Promise<void> {
+export async function endRoom(
+  roomId: string,
+  hostUserId: string,
+): Promise<void> {
   const room = await getRoom(roomId)
   if (!room) {
     throw new Error('Room not found.')

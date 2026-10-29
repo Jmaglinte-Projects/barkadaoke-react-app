@@ -3,12 +3,7 @@ import type { PlaybackState } from '@/types/youtube'
 export type RoomStatus = 'waiting' | 'active' | 'ended'
 export type RoomRole = 'host' | 'controller' | 'guest'
 
-export type PlaybackCommandType =
-  | 'play'
-  | 'pause'
-  | 'next'
-  | 'skip'
-  | 'restart'
+export type PlaybackCommandType = 'play' | 'pause' | 'next' | 'skip' | 'restart'
 
 export type PlaybackCommand = {
   id: string

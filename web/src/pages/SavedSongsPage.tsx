@@ -10,13 +10,8 @@ import { useSavedSongs } from '@/hooks/useSavedSongs'
 export function SavedSongsPage() {
   const { user } = useAuth()
   const { activeRoom, roomPath } = useActiveRoom()
-  const {
-    songs,
-    isLoading,
-    error,
-    pendingVideoId,
-    toggleBookmark,
-  } = useSavedSongs()
+  const { songs, isLoading, error, pendingVideoId, toggleBookmark } =
+    useSavedSongs()
 
   if (!user) {
     return null

@@ -10,9 +10,7 @@ export function useYouTubeSearch(query: string) {
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usedFallback, setUsedFallback] = useState(false)
-  const [searchMode, setSearchMode] = useState<SearchMode | 'mock' | null>(
-    null,
-  )
+  const [searchMode, setSearchMode] = useState<SearchMode | 'mock' | null>(null)
   const [youtubeSearchSucceeded, setYoutubeSearchSucceeded] = useState(false)
 
   useEffect(() => {

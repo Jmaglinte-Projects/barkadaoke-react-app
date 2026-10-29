@@ -68,7 +68,9 @@ export function SongSearch({
           ) : error ? (
             <p className="py-6 text-center text-sm text-destructive">{error}</p>
           ) : results.length === 0 ? (
-            <p className="py-6 text-center text-sm text-body">No results found.</p>
+            <p className="py-6 text-center text-sm text-body">
+              No results found.
+            </p>
           ) : (
             <ul>
               {results.map((result) => (

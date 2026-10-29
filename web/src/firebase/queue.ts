@@ -13,16 +13,10 @@ import {
 } from 'firebase/firestore'
 
 import { getDb } from '@/firebase/config'
-import {
-  getCallableErrorMessage,
-  upsertCatalogSong,
-} from '@/firebase/catalog'
+import { getCallableErrorMessage, upsertCatalogSong } from '@/firebase/catalog'
 import { mapQueueItem } from '@/firebase/mappers'
 import { getNextSong, getUpcomingQueue } from '@/lib/queue'
-import {
-  MAX_UPCOMING_SONGS_PER_USER,
-  type QueueItem,
-} from '@/types/queue'
+import { MAX_UPCOMING_SONGS_PER_USER, type QueueItem } from '@/types/queue'
 import type { UserProfile } from '@/types/user'
 import type { SongSearchResult } from '@/types/youtube'
 
@@ -37,7 +31,11 @@ export function subscribeToQueue(
       orderBy('order', 'asc'),
     ),
     (snapshot) => {
-      onChange(snapshot.docs.map((docSnap) => mapQueueItem(docSnap.id, docSnap.data())))
+      onChange(
+        snapshot.docs.map((docSnap) =>
+          mapQueueItem(docSnap.id, docSnap.data()),
+        ),
+      )
     },
     (error) => onError?.(error),
   )

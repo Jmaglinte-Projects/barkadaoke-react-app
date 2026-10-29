@@ -1,28 +1,28 @@
-import { Link } from "react-router-dom";
-import { LogIn, Plus, Radio } from "lucide-react";
+import { Link } from 'react-router-dom'
+import { LogIn, Plus, Radio } from 'lucide-react'
 
-import { Button } from "@/components/ui/button";
-import { useActiveRoom } from "@/hooks/useActiveRoom";
-import { useAuth } from "@/hooks/useAuth";
+import { Button } from '@/components/ui/button'
+import { useActiveRoom } from '@/hooks/useActiveRoom'
+import { useAuth } from '@/hooks/useAuth'
 
 export function HomePage() {
-  const { user } = useAuth();
-  const { activeRoom, roomPath, isLoading } = useActiveRoom();
+  const { user } = useAuth()
+  const { activeRoom, roomPath, isLoading } = useActiveRoom()
 
   if (!user) {
-    return null;
+    return null
   }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 md:px-8">
       <p className="eyebrow-mono text-mute">Welcome back</p>
       <h1 className="display-lg mt-2 text-ink-strong">
-        Hey, {user.displayName.split(" ")[0]}
+        Hey, {user.displayName.split(' ')[0]}
       </h1>
       <p className="mt-3 max-w-lg text-body">
         {activeRoom
-          ? "You are already in a karaoke session. Return to it, or end/leave before starting another."
-          : "Start a karaoke room for the TV, or join a friend with a room code."}
+          ? 'You are already in a karaoke session. Return to it, or end/leave before starting another.'
+          : 'Start a karaoke room for the TV, or join a friend with a room code.'}
       </p>
 
       {isLoading ? (
@@ -78,5 +78,5 @@ export function HomePage() {
         </div>
       )}
     </main>
-  );
+  )
 }

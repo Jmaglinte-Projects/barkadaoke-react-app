@@ -11,10 +11,7 @@ import {
 } from 'firebase/firestore'
 
 import { getDb } from '@/firebase/config'
-import {
-  getCallableErrorMessage,
-  upsertCatalogSong,
-} from '@/firebase/catalog'
+import { getCallableErrorMessage, upsertCatalogSong } from '@/firebase/catalog'
 import { mapSavedSong } from '@/firebase/mappers'
 import type { BookmarkableSong, SavedSong } from '@/types/saved-song'
 import type { QueueItem } from '@/types/queue'

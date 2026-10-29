@@ -35,11 +35,7 @@ export function GoogleSignInButton({
       disabled={isSigningIn}
     >
       <GoogleIcon />
-      {isSigningIn
-        ? 'Signing in…'
-        : isMockAuth
-          ? `${label} (demo)`
-          : label}
+      {isSigningIn ? 'Signing in…' : isMockAuth ? `${label} (demo)` : label}
     </Button>
   )
 }

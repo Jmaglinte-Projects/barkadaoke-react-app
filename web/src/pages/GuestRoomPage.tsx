@@ -104,8 +104,7 @@ export function GuestRoomPage() {
     [upcoming, user?.uid],
   )
   const mySong =
-    myUpcoming[0] ??
-    (current?.singerUserId === user?.uid ? current : null)
+    myUpcoming[0] ?? (current?.singerUserId === user?.uid ? current : null)
   const atUpcomingLimit = myUpcoming.length >= MAX_UPCOMING_SONGS_PER_USER
   const visibleQueue = useMemo(() => getVisibleQueue(queue), [queue])
   const isHost = Boolean(user && room && room.hostUserId === user.uid)
@@ -224,7 +223,10 @@ export function GuestRoomPage() {
               {myUpcoming.length > 0 ? (
                 <ul className="mt-2 space-y-1">
                   {myUpcoming.map((song) => (
-                    <li key={song.id} className="truncate text-sm text-foreground">
+                    <li
+                      key={song.id}
+                      className="truncate text-sm text-foreground"
+                    >
                       {song.title}
                     </li>
                   ))}

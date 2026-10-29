@@ -99,8 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signOutUser()
       setUser(null)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Sign out failed'
+      const message = error instanceof Error ? error.message : 'Sign out failed'
       toast.error(message)
       throw error
     }
