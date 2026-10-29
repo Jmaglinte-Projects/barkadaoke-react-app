@@ -2,5 +2,7 @@
 .DS_Store
 *.log
 firebase-debug.log*
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/

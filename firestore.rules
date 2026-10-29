@@ -48,20 +48,38 @@ service cloud.firestore {
         .hasOnly(['playbackCommand', 'updatedAt']);
     }
 
+    function validSongLimit(value) {
+      return value == null || (value is int && value > 0);
+    }
+
+    function validRoomSettings(settings) {
+      return settings is map
+        && settings.keys().hasOnly(['queueLimit', 'songsPerUser', 'memberLimit'])
+        && validSongLimit(settings.queueLimit)
+        && validSongLimit(settings.songsPerUser)
+        && settings.memberLimit is int && settings.memberLimit > 0;
+    }
+
     match /rooms/{roomId} {
       // Host creates the room with themselves as the first member (count = 1).
       allow create: if isSignedIn()
         && request.resource.data.hostUserId == request.auth.uid
         && request.resource.data.roomCode is string
         && request.resource.data.status in ['waiting', 'active']
-        && request.resource.data.memberCount == 1;
+        && request.resource.data.memberCount == 1
+        && (!('settings' in request.resource.data) || validRoomSettings(request.resource.data.settings))
+        && !('queueRevision' in request.resource.data);
 
       // Signed-in users can look up rooms by code / id.
       allow read: if isSignedIn();
 
-      // Host controls all room fields. Controllers may only issue playback commands.
-      allow update: if isRoomHost(roomId)
-        || (
+      // Capacity, allowances and queue serialization are managed by trusted callables.
+      // The host keeps playback/presence controls; controllers issue commands only.
+      allow update: if (
+          isRoomHost(roomId)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['hostUserId', 'roomCode', 'settings', 'memberCount', 'queueRevision', 'createdAt'])
+        ) || (
           canIssuePlaybackCommand(roomId)
           && onlyPlaybackCommandChanged()
           && isValidPlaybackCommand(request.resource.data.playbackCommand)
@@ -76,7 +94,9 @@ service cloud.firestore {
         allow create: if isSignedIn()
           && request.auth.uid == memberId
           && request.resource.data.userId == request.auth.uid
-          && request.resource.data.role == 'host';
+          && request.resource.data.role == 'host'
+          && getAfter(/databases/$(database)/documents/rooms/$(roomId)).data.hostUserId == request.auth.uid
+          && request.resource.data.keys().hasOnly(['userId', 'displayName', 'photoURL', 'role', 'joinedAt']);
 
         // Host may promote/demote guests <-> controllers. Host role is immutable.
         // Users cannot grant themselves controller permission.
@@ -90,22 +110,29 @@ service cloud.firestore {
           && resource.data.role != 'host';
       }
 
+      // Retain host-assigned allowances when someone leaves and rejoins.
+      match /songAllowances/{userId} {
+        allow read, write: if false;
+      }
+
       match /queue/{queueItemId} {
         allow read: if isSignedIn();
 
-        allow create: if isSignedIn()
-          && isRoomMember(roomId)
-          && request.resource.data.singerUserId == request.auth.uid
-          && request.resource.data.status == 'queued';
+        // The callable checks both limits and allocates order atomically.
+        allow create: if false;
 
-        // Queue advance / remove remains host-only. Controllers send playback
-        // commands; the host player device applies next/skip against the queue.
-        allow update: if isRoomHost(roomId)
-          || (
-            isRoomMember(roomId)
-            && resource.data.singerUserId == request.auth.uid
-            && request.resource.data.status == 'removed'
-            && request.resource.data.singerUserId == resource.data.singerUserId
+        allow update: if request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'startedAt', 'completedAt'])
+          && (
+            (isRoomHost(roomId)
+              && request.resource.data.status in ['playing', 'completed', 'skipped', 'removed'])
+            || (
+              isRoomMember(roomId)
+              && resource.data.singerUserId == request.auth.uid
+              && resource.data.status in ['queued', 'playing']
+              && request.resource.data.status == 'removed'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt'])
+            )
           );
 
         allow delete: if false;

@@ -12,7 +12,15 @@ export type PlaybackCommand = {
   issuedAt: string
 }
 
-export const MAX_ROOM_MEMBERS = 5
+export type SongLimit = number | null
+
+export type RoomSettings = {
+  /** null means unlimited; only waiting songs count. */
+  queueLimit: SongLimit
+  songsPerUser: SongLimit
+  /** Includes the host. */
+  memberLimit: number
+}
 
 /** Heartbeat interval for the host player device. */
 export const PLAYER_PRESENCE_HEARTBEAT_MS = 12_000
@@ -33,6 +41,7 @@ export type KaraokeRoom = {
   playerLastSeenAt: string | null
   /** Device id of the tab currently publishing player presence. */
   playerDeviceId: string | null
+  settings: RoomSettings
   memberCount: number
   createdAt: string
   updatedAt: string
@@ -43,6 +52,8 @@ export type RoomMember = {
   displayName: string
   photoURL?: string
   role: RoomRole
+  /** undefined inherits the room default; null means unlimited. */
+  songLimitOverride?: SongLimit
   joinedAt: string
 }
 

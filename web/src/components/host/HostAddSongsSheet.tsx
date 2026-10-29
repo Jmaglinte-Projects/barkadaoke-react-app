@@ -14,7 +14,8 @@ import {
 import { savedSongToSearchResult } from '@/firebase/bookmarks'
 import { useSavedSongs } from '@/hooks/useSavedSongs'
 import { cn } from '@/lib/utils'
-import { MAX_UPCOMING_SONGS_PER_USER } from '@/types/queue'
+import { formatLimit } from '@/lib/room-limits'
+import type { SongLimit } from '@/types/room'
 import type { SavedSong } from '@/types/saved-song'
 import type { SongSearchResult } from '@/types/youtube'
 
@@ -23,6 +24,10 @@ type HostAddSongsSheetProps = {
   onOpenChange: (open: boolean) => void
   onAddSong: (song: SongSearchResult) => void | Promise<void>
   myUpcomingCount: number
+  songLimit: SongLimit
+  queueLimit: SongLimit
+  roomUpcomingCount: number
+  limitMessage: string | null
 }
 
 type AddTab = 'search' | 'saved'
@@ -32,6 +37,10 @@ export function HostAddSongsSheet({
   onOpenChange,
   onAddSong,
   myUpcomingCount,
+  songLimit,
+  queueLimit,
+  roomUpcomingCount,
+  limitMessage,
 }: HostAddSongsSheetProps) {
   const titleId = useId()
   const searchPanelRef = useRef<HTMLDivElement>(null)
@@ -44,7 +53,7 @@ export function HostAddSongsSheet({
     toggleBookmark,
   } = useSavedSongs()
 
-  const atLimit = myUpcomingCount >= MAX_UPCOMING_SONGS_PER_USER
+  const atLimit = Boolean(limitMessage)
   const addDisabled = atLimit || isAddingSong
 
   useEffect(() => {
@@ -99,7 +108,10 @@ export function HostAddSongsSheet({
             Search or queue from your saved list. Playback keeps running.
           </SheetDescription>
           <p className="mt-2 font-mono text-xs text-mute">
-            Your upcoming: {myUpcomingCount}/{MAX_UPCOMING_SONGS_PER_USER}
+            Your upcoming: {myUpcomingCount}/{formatLimit(songLimit)}
+            <span className="mt-1 block">
+              Room queue: {roomUpcomingCount}/{formatLimit(queueLimit)}
+            </span>
           </p>
         </SheetHeader>
 
@@ -121,8 +133,7 @@ export function HostAddSongsSheet({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {atLimit ? (
             <p className="mb-4 rounded-md border border-border bg-canvas-soft px-3 py-2 text-sm text-body">
-              You already have {MAX_UPCOMING_SONGS_PER_USER} upcoming songs.
-              Wait for one to start or remove one to add another.
+              {limitMessage}
             </p>
           ) : null}
 

@@ -30,7 +30,16 @@ npm run format
 npm run format:check
 ```
 
-The Biome configuration supports Tailwind CSS v4 directives. Keep styling in
+The repository-root `biome.json` is the shared source of formatting settings;
+`web/biome.json` inherits it. The configuration supports Tailwind CSS v4 directives.
+
+Workspace settings are included for VS Code/Cursor whether you open the repository
+root or `web/`. With the recommended **Biome** extension enabled, files autosave
+when you leave the editor, format on save, and apply safe unused-import fixes.
+Explicit saves also format and fix the file. Biome uses the version installed by
+`npm install` in `web/`, rather than an unrelated global version.
+
+Keep styling in
 Tailwind utility classes, reuse shared components and theme tokens, and reserve
 custom CSS for rules utilities cannot express cleanly. Oxlint remains the linter.
 
@@ -103,3 +112,55 @@ firebase deploy --only functions
 ## YouTube host player
 
 The host room embeds the YouTube IFrame Player API. Playback state syncs to Firestore (`playing` / `paused` / `ended`). When a song ends, press **Next** to advance (avoids autoplay restrictions).
+
+## Host queue settings
+
+Open **Room settings** in the host view to change:
+
+- **Room queue limit:** a positive whole number or Unlimited (default).
+- **Songs per user:** a positive whole number or Unlimited (default: 3).
+- **Room capacity:** a positive whole number including the host (default: 5).
+- **Individual song allowances:** inherit the room default, use a custom number,
+  or allow Unlimited. Overrides persist when the same user leaves and rejoins.
+
+Only songs with `queued` status count. A song starting, being removed, or being
+skipped releases its waiting slot. Lowering a limit does not remove existing
+songs or participants; it blocks new additions/joins until there is space.
+Existing members can reconnect to a full room. Old rooms without settings use
+the defaults above.
+
+Song additions and settings saves now use trusted Cloud Functions. Deploy the
+backend before releasing the updated UI and rules:
+
+```bash
+firebase deploy --only functions
+npm --prefix web run build
+firebase deploy --only firestore:rules,hosting
+```
+
+Older open clients must reload after deployment; direct client queue creation is
+blocked by the new rules. Do not restore a direct-write fallback, which would
+bypass the limits.
+
+## Local limits and permissions tests
+
+Install both the `web` and `functions` dependencies. Run the policy tests with:
+
+```bash
+npm --prefix functions test
+```
+
+To also run concurrency and Firestore security-rule tests, from the repository
+root with Java 21+ and Firebase CLI available:
+
+```bash
+firebase emulators:exec --project demo-barkadaoke-limits --config firebase.test.json --only firestore "npm --prefix functions test"
+```
+
+The tests use a demo project and refuse a non-local emulator address. Without an
+emulator, transaction and rules tests are reported as skipped.
+
+For manual UI testing, start the Firestore, Auth, and Functions emulators using
+`firebase.test.json`. Run Vite with `VITE_USE_FIREBASE_EMULATORS=true` and Firebase
+configuration for the demo project. Emulator routing is available in development
+only; never use production project credentials for local tests.

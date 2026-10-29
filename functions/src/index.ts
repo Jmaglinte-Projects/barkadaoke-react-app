@@ -8,3 +8,6 @@ export { searchVideos } from './youtube/searchVideos'
 export { upsertCatalogSongCallable } from './catalog/upsertCatalogSongCallable'
 export { joinRoom } from './rooms/joinRoom'
 export { leaveRoom } from './rooms/leaveRoom'
+
+export { updateRoomSettings } from './rooms/updateRoomSettings'
+export { addSongToQueue } from './queue/addSongToQueue'

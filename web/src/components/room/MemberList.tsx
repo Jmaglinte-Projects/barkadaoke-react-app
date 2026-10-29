@@ -1,15 +1,21 @@
-import { ChevronDown } from 'lucide-react'
-
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import {
-  MAX_ROOM_MEMBERS,
-  type AssignableMemberRole,
-  type RoomMember,
+import { SelectField } from '@/components/ui/select-field'
+import { DEFAULT_ROOM_SETTINGS } from '@/lib/room-limits'
+import type {
+  AssignableMemberRole,
+  RoomMember,
+  RoomSettings,
 } from '@/types/room'
+
+const roleOptions = [
+  { value: 'guest', label: 'Guest' },
+  { value: 'controller', label: 'Controller' },
+]
 
 type MemberListProps = {
   members: RoomMember[]
+  settings?: RoomSettings
   /** When true, show guest/controller role controls for non-host members. */
   canManageRoles?: boolean
   rolePendingUserId?: string | null
@@ -18,11 +24,12 @@ type MemberListProps = {
 
 export function MemberList({
   members,
+  settings = DEFAULT_ROOM_SETTINGS,
   canManageRoles = false,
   rolePendingUserId = null,
   onChangeRole,
 }: MemberListProps) {
-  const isFull = members.length >= MAX_ROOM_MEMBERS
+  const isFull = members.length >= settings.memberLimit
 
   return (
     <div className="hairline-card p-4">
@@ -30,12 +37,12 @@ export function MemberList({
         <p className="eyebrow-mono text-mute">Participants</p>
         <div className="flex items-center gap-2">
           {isFull ? (
-            <Badge variant="outline" className="rounded-full">
+            <Badge variant="outline" className="h-8 shrink-0 rounded-full px-3">
               Full
             </Badge>
           ) : null}
           <span className="font-mono text-sm text-body">
-            {members.length}/{MAX_ROOM_MEMBERS}
+            {members.length}/{settings.memberLimit}
           </span>
         </div>
       </div>
@@ -61,35 +68,29 @@ export function MemberList({
                 </p>
               </div>
               {member.role === 'host' ? (
-                <Badge variant="outline" className="rounded-full">
+                <Badge
+                  variant="outline"
+                  className="h-8 shrink-0 rounded-full px-3"
+                >
                   Host
                 </Badge>
               ) : showRoleSelect ? (
-                <div className="relative shrink-0">
-                  <select
-                    aria-label={`Role for ${member.displayName}`}
-                    className="h-8 max-w-[9.5rem] appearance-none rounded-md border border-border bg-background py-0 pl-2.5 pr-8 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-                    value={
-                      member.role === 'controller' ? 'controller' : 'guest'
-                    }
-                    disabled={isPending}
-                    onChange={(event) => {
-                      onChangeRole(
-                        member.userId,
-                        event.target.value as AssignableMemberRole,
-                      )
-                    }}
-                  >
-                    <option value="guest">Guest</option>
-                    <option value="controller">Controller</option>
-                  </select>
-                  <ChevronDown
-                    aria-hidden
-                    className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-mute"
-                  />
-                </div>
+                <SelectField
+                  aria-label={`Role for ${member.displayName}`}
+                  value={member.role === 'controller' ? 'controller' : 'guest'}
+                  options={roleOptions}
+                  disabled={isPending}
+                  className="h-8 w-29 shrink-0 rounded-full bg-canvas-soft/60 px-3 text-xs"
+                  onValueChange={(role) => {
+                    if (role === 'guest' || role === 'controller')
+                      onChangeRole?.(member.userId, role)
+                  }}
+                />
               ) : member.role === 'controller' ? (
-                <Badge variant="default" className="rounded-full">
+                <Badge
+                  variant="default"
+                  className="h-8 shrink-0 rounded-full px-3"
+                >
                   Controller
                 </Badge>
               ) : null}

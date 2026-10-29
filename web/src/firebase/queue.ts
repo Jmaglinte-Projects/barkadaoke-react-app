@@ -1,8 +1,6 @@
 import {
-  addDoc,
   collection,
   doc,
-  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -12,12 +10,13 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 
-import { getDb } from '@/firebase/config'
+import { httpsCallable } from 'firebase/functions'
+
+import { getDb, getFirebaseFunctions } from '@/firebase/config'
 import { getCallableErrorMessage, upsertCatalogSong } from '@/firebase/catalog'
 import { mapQueueItem } from '@/firebase/mappers'
-import { getNextSong, getUpcomingQueue } from '@/lib/queue'
-import { MAX_UPCOMING_SONGS_PER_USER, type QueueItem } from '@/types/queue'
-import type { UserProfile } from '@/types/user'
+import { getNextSong } from '@/lib/queue'
+import type { QueueItem } from '@/types/queue'
 import type { SongSearchResult } from '@/types/youtube'
 
 export function subscribeToQueue(
@@ -41,34 +40,12 @@ export function subscribeToQueue(
   )
 }
 
-async function getNextOrder(roomId: string): Promise<number> {
-  const snapshot = await getDocs(collection(getDb(), 'rooms', roomId, 'queue'))
-  let maxOrder = 0
-  for (const docSnap of snapshot.docs) {
-    const order = Number(docSnap.data().order ?? 0)
-    if (order > maxOrder) maxOrder = order
-  }
-  return maxOrder + 1
-}
-
 export async function addSongToQueue(
   roomId: string,
-  user: UserProfile,
   song: SongSearchResult,
-  existingQueue: QueueItem[],
 ): Promise<void> {
-  const myUpcomingCount = getUpcomingQueue(existingQueue).filter(
-    (item) => item.singerUserId === user.uid,
-  ).length
-  if (myUpcomingCount >= MAX_UPCOMING_SONGS_PER_USER) {
-    throw new Error(
-      `You can only have ${MAX_UPCOMING_SONGS_PER_USER} upcoming songs at a time.`,
-    )
-  }
-
   // Select-time catalog upsert refreshes metadata and rejects deleted videos.
   let title = song.title
-  let thumbnailUrl = song.thumbnailUrl
   try {
     const catalog = await upsertCatalogSong({
       videoId: song.videoId,
@@ -77,7 +54,6 @@ export async function addSongToQueue(
       channelTitle: song.channelTitle,
     })
     title = catalog.title
-    thumbnailUrl = catalog.thumbnailUrl
   } catch (error) {
     const code =
       error && typeof error === 'object' && 'code' in error
@@ -94,18 +70,20 @@ export async function addSongToQueue(
     // Undeployed callable / missing API key: queue with search metadata.
   }
 
-  const order = await getNextOrder(roomId)
-  await addDoc(collection(getDb(), 'rooms', roomId, 'queue'), {
-    youtubeVideoId: song.videoId,
-    title,
-    thumbnailUrl,
-    singerUserId: user.uid,
-    singerName: user.displayName,
-    singerPhotoURL: user.photoURL ?? null,
-    status: 'queued',
-    order,
-    createdAt: serverTimestamp(),
-  })
+  try {
+    await httpsCallable(
+      getFirebaseFunctions(),
+      'addSongToQueue',
+    )({
+      roomId,
+      videoId: song.videoId,
+      title,
+    })
+  } catch (error) {
+    throw new Error(
+      getCallableErrorMessage(error, 'Could not add song to queue.'),
+    )
+  }
 }
 
 export async function removeQueueItem(

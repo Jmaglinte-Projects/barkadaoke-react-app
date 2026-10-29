@@ -1,5 +1,6 @@
 import type { DocumentData, Timestamp } from 'firebase/firestore'
 
+import { isPositiveInteger, readRoomSettings } from '@/lib/room-limits'
 import type { QueueItem } from '@/types/queue'
 import type {
   KaraokeRoom,
@@ -72,6 +73,7 @@ export function mapRoom(id: string, data: DocumentData): KaraokeRoom {
       typeof data.playerLastSeenAt === 'string' ? data.playerLastSeenAt : null,
     playerDeviceId:
       typeof data.playerDeviceId === 'string' ? data.playerDeviceId : null,
+    settings: readRoomSettings(data.settings),
     memberCount: Number(data.memberCount ?? 0),
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
@@ -84,6 +86,11 @@ export function mapMember(id: string, data: DocumentData): RoomMember {
     displayName: String(data.displayName ?? 'Guest'),
     photoURL: typeof data.photoURL === 'string' ? data.photoURL : undefined,
     role: mapRoomRole(data.role),
+    songLimitOverride:
+      data.songLimitOverride === null ||
+      isPositiveInteger(data.songLimitOverride)
+        ? data.songLimitOverride
+        : undefined,
     joinedAt: toIso(data.joinedAt),
   }
 }

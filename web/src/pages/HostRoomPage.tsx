@@ -14,6 +14,7 @@ import {
 } from '@/components/player/YouTubePlayer'
 import { QueueList } from '@/components/queue/QueueList'
 import { MemberList } from '@/components/room/MemberList'
+import { RoomSettingsDialog } from '@/components/room/RoomSettingsDialog'
 import { RoomQRCode } from '@/components/room/RoomQRCode'
 import { BookmarkButton } from '@/components/songs/BookmarkButton'
 import { BuyMeCoffeeLink } from '@/components/support/BuyMeCoffeeLink'
@@ -40,6 +41,12 @@ import { useQueue } from '@/hooks/useQueue'
 import { useRoom } from '@/hooks/useRoom'
 import { useRoomMembers } from '@/hooks/useRoomMembers'
 import { useSavedSongs } from '@/hooks/useSavedSongs'
+import {
+  DEFAULT_ROOM_SETTINGS,
+  formatLimit,
+  getQueueLimitMessage,
+  getUserSongLimit,
+} from '@/lib/room-limits'
 import { getDeviceId } from '@/lib/device-id'
 import { getRoomJoinUrl } from '@/lib/room-code'
 import { cn } from '@/lib/utils'
@@ -116,6 +123,17 @@ export function HostRoomPage() {
   const myUpcomingCount = useMemo(
     () => upcoming.filter((item) => item.singerUserId === user?.uid).length,
     [upcoming, user?.uid],
+  )
+  const myMember = members.find((member) => member.userId === user?.uid)
+  const songLimit = getUserSongLimit(
+    room?.settings ?? DEFAULT_ROOM_SETTINGS,
+    myMember,
+  )
+  const limitMessage = getQueueLimitMessage(
+    room,
+    myMember,
+    upcoming.length,
+    myUpcomingCount,
   )
   const isHost = Boolean(user && room && room.hostUserId === user.uid)
 
@@ -405,7 +423,7 @@ export function HostRoomPage() {
   async function handleAddSong(result: SongSearchResult) {
     if (!roomId || !user) return
     try {
-      await addSongToQueue(roomId, user, result, queue)
+      await addSongToQueue(roomId, result)
       toast.success('Song added to queue')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add song')
@@ -618,7 +636,8 @@ export function HostRoomPage() {
               <section className="lg:pb-8">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <p className="eyebrow-mono text-mute">
-                    Queue · {upcoming.length}
+                    Queue · {upcoming.length}/
+                    {formatLimit(room.settings.queueLimit)}
                   </p>
                   <Button
                     type="button"
@@ -694,8 +713,10 @@ export function HostRoomPage() {
               ) : null}
             </section>
 
+            <RoomSettingsDialog room={room} members={members} />
             <MemberList
               members={members}
+              settings={room.settings}
               canManageRoles
               rolePendingUserId={rolePendingUserId}
               onChangeRole={(memberUserId, role) => {
@@ -741,6 +762,10 @@ export function HostRoomPage() {
         open={addSongsOpen}
         onOpenChange={setAddSongsOpen}
         myUpcomingCount={myUpcomingCount}
+        songLimit={songLimit}
+        queueLimit={room.settings.queueLimit}
+        roomUpcomingCount={upcoming.length}
+        limitMessage={limitMessage}
         onAddSong={handleAddSong}
       />
     </div>

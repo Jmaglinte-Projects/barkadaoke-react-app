@@ -79,7 +79,9 @@ export function CreateRoomPage() {
 
         <div className="rounded-md border border-dashed border-border bg-canvas-soft p-4 text-sm text-body">
           Host controls stay on this device. Guests search and queue from their
-          phones. You can only host one active room at a time.
+          phones. Start with an unlimited queue, 3 waiting songs per person, and
+          space for 5 people including you. Adjust these anytime in Room
+          settings. You can only host one active room at a time.
         </div>
 
         <div className="flex flex-wrap gap-2">

@@ -28,7 +28,12 @@ import {
   getUpcomingQueue,
   getVisibleQueue,
 } from '@/lib/queue'
-import { MAX_UPCOMING_SONGS_PER_USER } from '@/types/queue'
+import {
+  DEFAULT_ROOM_SETTINGS,
+  formatLimit,
+  getQueueLimitMessage,
+  getUserSongLimit,
+} from '@/lib/room-limits'
 import type { SavedSong } from '@/types/saved-song'
 import type { SongSearchResult } from '@/types/youtube'
 import { cn } from '@/lib/utils'
@@ -105,7 +110,18 @@ export function GuestRoomPage() {
   )
   const mySong =
     myUpcoming[0] ?? (current?.singerUserId === user?.uid ? current : null)
-  const atUpcomingLimit = myUpcoming.length >= MAX_UPCOMING_SONGS_PER_USER
+  const myMember = members.find((member) => member.userId === user?.uid)
+  const songLimit = getUserSongLimit(
+    room?.settings ?? DEFAULT_ROOM_SETTINGS,
+    myMember,
+  )
+  const limitMessage = getQueueLimitMessage(
+    room,
+    myMember,
+    upcoming.length,
+    myUpcoming.length,
+  )
+  const atUpcomingLimit = Boolean(limitMessage)
   const visibleQueue = useMemo(() => getVisibleQueue(queue), [queue])
   const isHost = Boolean(user && room && room.hostUserId === user.uid)
   const canControl = canControlPlayback(user?.uid, room, members)
@@ -162,7 +178,7 @@ export function GuestRoomPage() {
     if (!roomId || !user || isAddingSong) return
     setIsAddingSong(true)
     try {
-      await addSongToQueue(roomId, user, result, queue)
+      await addSongToQueue(roomId, result)
       toast.success('Song added to queue')
       setTab('queue')
     } catch (error) {
@@ -217,7 +233,7 @@ export function GuestRoomPage() {
               <div className="flex items-center justify-between gap-2">
                 <p className="eyebrow-mono text-mute">My songs</p>
                 <span className="font-mono text-xs text-mute">
-                  {myUpcoming.length}/{MAX_UPCOMING_SONGS_PER_USER}
+                  {myUpcoming.length}/{formatLimit(songLimit)}
                 </span>
               </div>
               {myUpcoming.length > 0 ? (
@@ -246,7 +262,7 @@ export function GuestRoomPage() {
                 </p>
               )}
             </div>
-            <MemberList members={members} />
+            <MemberList members={members} settings={room.settings} />
             {canControl ? (
               <Button variant="outline" className="w-full" asChild>
                 <Link to={`/room/${room.id}/remote`}>Open remote control</Link>
@@ -273,11 +289,13 @@ export function GuestRoomPage() {
 
         {tab === 'search' ? (
           <div className="space-y-3">
+            <p className="text-xs text-mute">
+              Room queue: {upcoming.length}/
+              {formatLimit(room.settings.queueLimit)} · Your songs:{' '}
+              {myUpcoming.length}/{formatLimit(songLimit)}
+            </p>
             {atUpcomingLimit ? (
-              <p className="text-sm text-mute">
-                You already have {MAX_UPCOMING_SONGS_PER_USER} upcoming songs.
-                Wait until one starts or remove one to add another.
-              </p>
+              <p className="text-sm text-mute">{limitMessage}</p>
             ) : null}
             <SongSearch
               onAddSong={handleAddSong}
@@ -299,10 +317,7 @@ export function GuestRoomPage() {
               </p>
             </div>
             {atUpcomingLimit ? (
-              <p className="text-sm text-mute">
-                You already have {MAX_UPCOMING_SONGS_PER_USER} upcoming songs.
-                Wait until one starts or remove one to add another.
-              </p>
+              <p className="text-sm text-mute">{limitMessage}</p>
             ) : null}
             {savedLoading ? (
               <p className="text-sm text-body">Loading saved songs…</p>
@@ -329,7 +344,8 @@ export function GuestRoomPage() {
             <div>
               <p className="eyebrow-mono text-mute">Up next</p>
               <h2 className="mt-1 text-lg font-semibold text-ink-strong">
-                {upcoming.length} song{upcoming.length === 1 ? '' : 's'} waiting
+                {upcoming.length}/{formatLimit(room.settings.queueLimit)} songs
+                waiting
               </h2>
             </div>
             <QueueList
