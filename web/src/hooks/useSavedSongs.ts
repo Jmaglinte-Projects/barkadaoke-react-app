@@ -17,8 +17,10 @@ export function useSavedSongs() {
   const [error, setError] = useState<string | null>(null)
   const [pendingVideoId, setPendingVideoId] = useState<string | null>(null)
 
+  const uid = user?.uid
+
   useEffect(() => {
-    if (!user) {
+    if (!uid) {
       setSongs([])
       setIsLoading(false)
       return
@@ -26,7 +28,7 @@ export function useSavedSongs() {
 
     setIsLoading(true)
     const unsubscribe = subscribeToSavedSongs(
-      user.uid,
+      uid,
       (items) => {
         setSongs(items)
         setIsLoading(false)
@@ -39,7 +41,7 @@ export function useSavedSongs() {
     )
 
     return unsubscribe
-  }, [user])
+  }, [uid])
 
   const savedVideoIds = useMemo(
     () => new Set(songs.map((song) => song.videoId)),

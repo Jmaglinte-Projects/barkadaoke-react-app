@@ -13,9 +13,10 @@ export function useYouTubeSearch(query: string) {
   const [searchMode, setSearchMode] = useState<SearchMode | 'mock' | null>(null)
   const [youtubeSearchSucceeded, setYoutubeSearchSucceeded] = useState(false)
 
+  const trimmed = query.trim().replace(/\s+/g, ' ')
+
   useEffect(() => {
-    const trimmed = query.trim()
-    if (!trimmed) {
+    if (trimmed.length < 2) {
       setResults([])
       setIsSearching(false)
       setError(null)
@@ -55,7 +56,7 @@ export function useYouTubeSearch(query: string) {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [query])
+  }, [trimmed])
 
   return {
     results,

@@ -16,6 +16,7 @@ import { httpsCallable } from 'firebase/functions'
 
 import { getDb, getFirebaseFunctions } from '@/firebase/config'
 import { mapMember, mapRoom } from '@/firebase/mappers'
+import { createRequestCache } from '@/lib/request-cache'
 import { roleSortRank } from '@/lib/playback'
 import { DEFAULT_ROOM_SETTINGS, readRoomSettings } from '@/lib/room-limits'
 import { generateRoomCode, normalizeRoomCode } from '@/lib/room-code'
@@ -176,11 +177,18 @@ export async function getRoom(roomId: string): Promise<KaraokeRoom | null> {
   return mapRoom(snap.id, snap.data())
 }
 
+// Strict Mode and concurrent consumers share work, but later visits revalidate.
+const joinRequests = createRequestCache()
+
 /** Trusted join via Cloud Function (transaction-safe room capacity). */
-export async function joinRoom(
+export function joinRoom(
   roomId: string,
-  _user: UserProfile,
+  user: Pick<UserProfile, 'uid'>,
 ): Promise<KaraokeRoom> {
+  return joinRequests(`${user.uid}:id:${roomId}`, () => performJoinRoom(roomId))
+}
+
+async function performJoinRoom(roomId: string): Promise<KaraokeRoom> {
   try {
     const callable = httpsCallable<{ roomId: string }, JoinRoomResponse>(
       getFirebaseFunctions(),
@@ -212,10 +220,17 @@ export async function joinRoom(
   }
 }
 
-export async function joinRoomByCode(
+export function joinRoomByCode(
   roomCode: string,
-  _user: UserProfile,
+  user: UserProfile,
 ): Promise<KaraokeRoom> {
+  const normalized = normalizeRoomCode(roomCode)
+  return joinRequests(`${user.uid}:code:${normalized}`, () =>
+    performJoinRoomByCode(normalized),
+  )
+}
+
+async function performJoinRoomByCode(roomCode: string): Promise<KaraokeRoom> {
   const normalized = normalizeRoomCode(roomCode)
   if (!normalized) {
     throw new Error('Enter a room code.')
@@ -286,16 +301,36 @@ export async function leaveRoom(roomId: string): Promise<void> {
   }
 }
 
-export async function setRoomPlaybackState(
+const playbackWrites = new Map<
+  string,
+  { state: PlaybackState; promise: Promise<void> }
+>()
+
+export function setRoomPlaybackState(
   roomId: string,
   playbackState: PlaybackState,
 ): Promise<void> {
   // Do not set status here — a late playback sync after endRoom was
   // re-writing status to 'active' and blocking new room creation.
-  await updateDoc(doc(getDb(), 'rooms', roomId), {
-    playbackState,
-    updatedAt: serverTimestamp(),
-  })
+  const previous = playbackWrites.get(roomId)
+  if (previous?.state === playbackState) return previous.promise
+
+  // Preserve event order while sharing duplicate callbacks from controls + iframe.
+  const promise = (previous?.promise ?? Promise.resolve())
+    .catch(() => {})
+    .then(() =>
+      updateDoc(doc(getDb(), 'rooms', roomId), {
+        playbackState,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  const pending = { state: playbackState, promise }
+  playbackWrites.set(roomId, pending)
+  const clear = () => {
+    if (playbackWrites.get(roomId) === pending) playbackWrites.delete(roomId)
+  }
+  void promise.then(clear, clear)
+  return promise
 }
 
 export async function issuePlaybackCommand(

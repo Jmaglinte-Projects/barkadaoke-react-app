@@ -46,6 +46,25 @@ export function formatLimit(limit: SongLimit): string {
   return limit === null ? 'Unlimited' : String(limit)
 }
 
+/** Count against a cap without awkward `n/Unlimited` ratios. */
+export function formatOccupancy(count: number, limit: SongLimit): string {
+  return limit === null ? String(count) : `${count}/${limit}`
+}
+
+/** Section eyebrow for a queue list. */
+export function formatQueueHeading(count: number, limit: SongLimit): string {
+  if (limit !== null) return `Queue · ${count}/${limit}`
+  if (count > 0) return `Queue · ${count} waiting`
+  return 'Queue'
+}
+
+/** Guest queue tab title for songs still waiting. */
+export function formatSongsWaiting(count: number, limit: SongLimit): string {
+  if (limit !== null) return `${count}/${limit} songs waiting`
+  if (count === 0) return 'No songs waiting'
+  return `${count} song${count === 1 ? '' : 's'} waiting`
+}
+
 export function getQueueLimitMessage(
   room: KaraokeRoom | null,
   member: RoomMember | undefined,

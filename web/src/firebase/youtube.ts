@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions'
 
-import { getFirebaseFunctions } from '@/firebase/config'
+import { getFirebaseAuth, getFirebaseFunctions } from '@/firebase/config'
+import { createRequestCache } from '@/lib/request-cache'
 import { MOCK_SEARCH_RESULTS } from '@/lib/mock-data'
 import type { SearchMode, SongSearchResult } from '@/types/youtube'
 
@@ -26,9 +27,19 @@ function withSearchDefaults(results: SongSearchResult[]): SongSearchResult[] {
   }))
 }
 
+const searchRequests = createRequestCache({ ttlMs: 60_000 })
+
 export async function searchKaraokeVideos(
   query: string,
 ): Promise<SearchKaraokeResult> {
+  const normalized = query.trim().replace(/\s+/g, ' ')
+  const uid = getFirebaseAuth().currentUser?.uid ?? 'anonymous'
+  return searchRequests(`${uid}:${normalized.toLowerCase()}`, () =>
+    fetchKaraokeVideos(normalized),
+  )
+}
+
+async function fetchKaraokeVideos(query: string): Promise<SearchKaraokeResult> {
   const callable = httpsCallable<{ query: string }, SearchVideosResponse>(
     getFirebaseFunctions(),
     'searchVideos',

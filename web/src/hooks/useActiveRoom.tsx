@@ -56,6 +56,7 @@ function writeStoredSession(uid: string, session: ActiveRoomSession | null) {
 
 export function ActiveRoomProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: authLoading } = useAuth()
+  const uid = user?.uid
   const [activeRoom, setActiveRoomState] = useState<ActiveRoomSession | null>(
     null,
   )
@@ -64,7 +65,7 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return
 
-    if (!user) {
+    if (!uid) {
       setActiveRoomState(null)
       setIsLoading(false)
       return
@@ -74,7 +75,7 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
 
     async function hydrate() {
       setIsLoading(true)
-      const stored = readStoredSession(user!.uid)
+      const stored = readStoredSession(uid!)
 
       try {
         if (stored) {
@@ -86,19 +87,19 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
               roomId: room.id,
               roomCode: room.roomCode,
               name: room.name,
-              role: room.hostUserId === user!.uid ? 'host' : stored.role,
+              role: room.hostUserId === uid! ? 'host' : stored.role,
             }
-            writeStoredSession(user!.uid, nextSession)
+            writeStoredSession(uid!, nextSession)
             setActiveRoomState(nextSession)
             return
           }
 
-          writeStoredSession(user!.uid, null)
+          writeStoredSession(uid!, null)
         }
 
         // Local session can be cleared while Firestore still has an
         // active hosted room (e.g. playback sync revived status after end).
-        const hosted = await findActiveHostedRoom(user!.uid)
+        const hosted = await findActiveHostedRoom(uid!)
         if (cancelled) return
 
         if (hosted) {
@@ -108,10 +109,10 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
             name: hosted.name,
             role: 'host',
           }
-          writeStoredSession(user!.uid, nextSession)
+          writeStoredSession(uid!, nextSession)
           setActiveRoomState(nextSession)
         } else {
-          writeStoredSession(user!.uid, null)
+          writeStoredSession(uid!, null)
           setActiveRoomState(null)
         }
       } catch {
@@ -126,21 +127,28 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [user, authLoading])
+  }, [uid, authLoading])
 
   const setActiveRoom = useCallback(
     (session: ActiveRoomSession) => {
-      if (!user) return
-      writeStoredSession(user.uid, session)
-      setActiveRoomState(session)
+      if (!uid) return
+      writeStoredSession(uid, session)
+      setActiveRoomState((current) =>
+        current?.roomId === session.roomId &&
+        current.roomCode === session.roomCode &&
+        current.name === session.name &&
+        current.role === session.role
+          ? current
+          : session,
+      )
     },
-    [user],
+    [uid],
   )
 
   const clearActiveRoom = useCallback(() => {
-    if (user) writeStoredSession(user.uid, null)
+    if (uid) writeStoredSession(uid, null)
     setActiveRoomState(null)
-  }, [user])
+  }, [uid])
 
   const roomPath = useMemo(() => {
     if (!activeRoom) return null

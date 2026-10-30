@@ -30,7 +30,8 @@ import {
 } from '@/lib/queue'
 import {
   DEFAULT_ROOM_SETTINGS,
-  formatLimit,
+  formatOccupancy,
+  formatSongsWaiting,
   getQueueLimitMessage,
   getUserSongLimit,
 } from '@/lib/room-limits'
@@ -233,7 +234,7 @@ export function GuestRoomPage() {
               <div className="flex items-center justify-between gap-2">
                 <p className="eyebrow-mono text-mute">My songs</p>
                 <span className="font-mono text-xs text-mute">
-                  {myUpcoming.length}/{formatLimit(songLimit)}
+                  {formatOccupancy(myUpcoming.length, songLimit)}
                 </span>
               </div>
               {myUpcoming.length > 0 ? (
@@ -290,9 +291,9 @@ export function GuestRoomPage() {
         {tab === 'search' ? (
           <div className="space-y-3">
             <p className="text-xs text-mute">
-              Room queue: {upcoming.length}/
-              {formatLimit(room.settings.queueLimit)} · Your songs:{' '}
-              {myUpcoming.length}/{formatLimit(songLimit)}
+              Room queue:{' '}
+              {formatOccupancy(upcoming.length, room.settings.queueLimit)} ·
+              Your songs: {formatOccupancy(myUpcoming.length, songLimit)}
             </p>
             {atUpcomingLimit ? (
               <p className="text-sm text-mute">{limitMessage}</p>
@@ -344,8 +345,10 @@ export function GuestRoomPage() {
             <div>
               <p className="eyebrow-mono text-mute">Up next</p>
               <h2 className="mt-1 text-lg font-semibold text-ink-strong">
-                {upcoming.length}/{formatLimit(room.settings.queueLimit)} songs
-                waiting
+                {formatSongsWaiting(
+                  upcoming.length,
+                  room.settings.queueLimit,
+                )}
               </h2>
             </div>
             <QueueList
