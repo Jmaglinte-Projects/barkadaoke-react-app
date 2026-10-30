@@ -2,7 +2,7 @@ import {
   collection,
   doc,
   onSnapshot,
-  orderBy,
+  where,
   query,
   serverTimestamp,
   updateDoc,
@@ -27,13 +27,14 @@ export function subscribeToQueue(
   return onSnapshot(
     query(
       collection(getDb(), 'rooms', roomId, 'queue'),
-      orderBy('order', 'asc'),
+      // Keep session history out of the live queue and initial download.
+      where('status', 'in', ['queued', 'playing']),
     ),
     (snapshot) => {
       onChange(
-        snapshot.docs.map((docSnap) =>
-          mapQueueItem(docSnap.id, docSnap.data()),
-        ),
+        snapshot.docs
+          .map((docSnap) => mapQueueItem(docSnap.id, docSnap.data()))
+          .sort((a, b) => a.order - b.order),
       )
     },
     (error) => onError?.(error),

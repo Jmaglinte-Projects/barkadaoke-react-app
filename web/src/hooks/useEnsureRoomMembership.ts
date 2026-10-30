@@ -10,8 +10,10 @@ export function useEnsureRoomMembership(
   const [isJoining, setIsJoining] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const uid = user?.uid
+
   useEffect(() => {
-    if (!roomId || !user) return
+    if (!roomId || !uid) return
 
     let cancelled = false
 
@@ -19,7 +21,7 @@ export function useEnsureRoomMembership(
       setIsJoining(true)
       setError(null)
       try {
-        await joinRoom(roomId!, user!)
+        await joinRoom(roomId!, { uid: uid! })
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to join room')
@@ -34,7 +36,7 @@ export function useEnsureRoomMembership(
     return () => {
       cancelled = true
     }
-  }, [roomId, user])
+  }, [roomId, uid])
 
   return { isJoining, error }
 }

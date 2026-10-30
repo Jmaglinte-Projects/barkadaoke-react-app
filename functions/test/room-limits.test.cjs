@@ -467,3 +467,72 @@ integration(
     )
   },
 )
+
+integration(
+  'live queue excludes history and sorts active songs without a composite index',
+  async () => {
+    const fs = require('node:fs')
+    const ts = require('typescript')
+    const Module = require('node:module')
+    const filename = require('node:path').resolve(
+      __dirname,
+      '../../web/src/firebase/queue.ts',
+    )
+    const loaded = new Module(filename, module)
+    const dependencies = {
+      'firebase/firestore': sdk,
+      'firebase/functions': {},
+      '@/firebase/config': { getDb: () => clientDb },
+      '@/firebase/catalog': {},
+      '@/firebase/mappers': { mapQueueItem: (id, data) => ({ id, ...data }) },
+      '@/lib/queue': {},
+    }
+    loaded.require = (name) => {
+      assert.ok(Object.hasOwn(dependencies, name), `Unexpected import: ${name}`)
+      return dependencies[name]
+    }
+    loaded._compile(
+      ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+        compilerOptions: { module: ts.ModuleKind.CommonJS },
+      }).outputText,
+      filename,
+    )
+    const batch = db.batch()
+    for (const [id, status, order] of [
+      ['history', 'completed', 1],
+      ['removed', 'removed', 2],
+      ['later', 'queued', 4],
+      ['current', 'playing', 3],
+      ['skipped', 'skipped', 5],
+    ])
+      batch.set(roomRef().collection('queue').doc(id), { status, order })
+    await batch.commit()
+    let unsubscribe
+    try {
+      const items = await new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(Error('Queue snapshot timed out')),
+          5000,
+        )
+        unsubscribe = loaded.exports.subscribeToQueue(
+          'party',
+          (items) => {
+            if (items.length === 0) return
+            clearTimeout(timer)
+            resolve(items)
+          },
+          (error) => {
+            clearTimeout(timer)
+            reject(error)
+          },
+        )
+      })
+      assert.deepEqual(
+        items.map((item) => item.id),
+        ['current', 'later'],
+      )
+    } finally {
+      unsubscribe?.()
+    }
+  },
+)

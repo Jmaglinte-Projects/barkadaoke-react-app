@@ -43,7 +43,7 @@ import { useRoomMembers } from '@/hooks/useRoomMembers'
 import { useSavedSongs } from '@/hooks/useSavedSongs'
 import {
   DEFAULT_ROOM_SETTINGS,
-  formatLimit,
+  formatQueueHeading,
   getQueueLimitMessage,
   getUserSongLimit,
 } from '@/lib/room-limits'
@@ -88,7 +88,8 @@ export function HostRoomPage() {
   const { room, isLoading: roomLoading, error: roomError } = useRoom(roomId)
   const { members } = useRoomMembers(roomId)
   const { queue } = useQueue(roomId)
-  const { isSaved, pendingVideoId, toggleQueueItemBookmark } = useSavedSongs()
+  const savedSongsState = useSavedSongs()
+  const { isSaved, pendingVideoId, toggleQueueItemBookmark } = savedSongsState
 
   useEffect(() => {
     if (!room || !user) return
@@ -167,7 +168,7 @@ export function HostRoomPage() {
   const lastProcessedCommandIdRef = useRef<string | null>(null)
   const commandsHydratedRef = useRef(false)
   const deviceIdRef = useRef(getDeviceId())
-  const roomStatus = room?.status
+  const roomEnded = room?.status === 'ended'
   const playbackCommand = room?.playbackCommand ?? null
   const playbackCommandId = playbackCommand?.id ?? null
 
@@ -193,7 +194,7 @@ export function HostRoomPage() {
 
   const handleAdvance = useCallback(
     async (mode: 'next' | 'skip') => {
-      if (!roomId) return
+      if (!roomId || isAdvancingRef.current || isEndingRef.current) return
 
       const currentRoom = roomRef.current
       const currentQueue = queueRef.current
@@ -211,6 +212,7 @@ export function HostRoomPage() {
         return
       }
 
+      isAdvancingRef.current = true
       setIsActing(true)
       try {
         if (!hasCurrent) {
@@ -235,6 +237,7 @@ export function HostRoomPage() {
           error instanceof Error ? error.message : 'Could not advance queue',
         )
       } finally {
+        isAdvancingRef.current = false
         setIsActing(false)
       }
     },
@@ -318,18 +321,22 @@ export function HostRoomPage() {
   // (and fast remounts) race the async clear against the next beat and leave
   // remotes stuck on "No player connected".
   useEffect(() => {
-    if (!roomId || !isHost || roomStatus === 'ended') return
+    if (!roomId || !isHost || roomEnded) return
     const activeRoomId = roomId
 
     const deviceId = deviceIdRef.current
     let cancelled = false
+    let pending = false
 
     async function beat() {
-      if (cancelled || isEndingRef.current) return
+      if (cancelled || pending || isEndingRef.current) return
+      pending = true
       try {
         await setPlayerPresence(activeRoomId, deviceId)
       } catch (error) {
         console.warn('[barkadaoke] player presence write failed', error)
+      } finally {
+        pending = false
       }
     }
 
@@ -348,7 +355,7 @@ export function HostRoomPage() {
       window.clearInterval(interval)
       window.removeEventListener('pagehide', onUnload)
     }
-  }, [isHost, roomId, roomStatus])
+  }, [isHost, roomId, roomEnded])
 
   const handleEnded = useCallback(() => {
     if (!roomId || isEndingRef.current || isAdvancingRef.current) return
@@ -636,8 +643,10 @@ export function HostRoomPage() {
               <section className="lg:pb-8">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <p className="eyebrow-mono text-mute">
-                    Queue · {upcoming.length}/
-                    {formatLimit(room.settings.queueLimit)}
+                    {formatQueueHeading(
+                      upcoming.length,
+                      room.settings.queueLimit,
+                    )}
                   </p>
                   <Button
                     type="button"
@@ -759,6 +768,7 @@ export function HostRoomPage() {
       ) : null}
 
       <HostAddSongsSheet
+        savedSongsState={savedSongsState}
         open={addSongsOpen}
         onOpenChange={setAddSongsOpen}
         myUpcomingCount={myUpcomingCount}

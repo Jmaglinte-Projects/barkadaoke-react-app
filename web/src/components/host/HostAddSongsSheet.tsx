@@ -12,14 +12,15 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { savedSongToSearchResult } from '@/firebase/bookmarks'
-import { useSavedSongs } from '@/hooks/useSavedSongs'
+import type { useSavedSongs } from '@/hooks/useSavedSongs'
 import { cn } from '@/lib/utils'
-import { formatLimit } from '@/lib/room-limits'
+import { formatOccupancy } from '@/lib/room-limits'
 import type { SongLimit } from '@/types/room'
 import type { SavedSong } from '@/types/saved-song'
 import type { SongSearchResult } from '@/types/youtube'
 
 type HostAddSongsSheetProps = {
+  savedSongsState: ReturnType<typeof useSavedSongs>
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddSong: (song: SongSearchResult) => void | Promise<void>
@@ -34,6 +35,7 @@ type AddTab = 'search' | 'saved'
 
 export function HostAddSongsSheet({
   open,
+  savedSongsState,
   onOpenChange,
   onAddSong,
   myUpcomingCount,
@@ -51,7 +53,7 @@ export function HostAddSongsSheet({
     isLoading: savedLoading,
     pendingVideoId,
     toggleBookmark,
-  } = useSavedSongs()
+  } = savedSongsState
 
   const atLimit = Boolean(limitMessage)
   const addDisabled = atLimit || isAddingSong
@@ -108,9 +110,9 @@ export function HostAddSongsSheet({
             Search or queue from your saved list. Playback keeps running.
           </SheetDescription>
           <p className="mt-2 font-mono text-xs text-mute">
-            Your upcoming: {myUpcomingCount}/{formatLimit(songLimit)}
+            Your upcoming: {formatOccupancy(myUpcomingCount, songLimit)}
             <span className="mt-1 block">
-              Room queue: {roomUpcomingCount}/{formatLimit(queueLimit)}
+              Room queue: {formatOccupancy(roomUpcomingCount, queueLimit)}
             </span>
           </p>
         </SheetHeader>
