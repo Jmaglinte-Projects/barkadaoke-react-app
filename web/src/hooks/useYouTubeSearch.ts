@@ -1,69 +1,74 @@
 import { useEffect, useState } from 'react'
 
-import { searchKaraokeVideos } from '@/firebase/youtube'
-import type { SearchMode, SongSearchResult } from '@/types/youtube'
+import {
+  searchKaraokeVideos,
+  type SearchKaraokeResult,
+} from '@/firebase/youtube'
+import type { SearchSource } from '@/types/youtube'
 
 const DEBOUNCE_MS = 550
 
-export function useYouTubeSearch(query: string) {
-  const [results, setResults] = useState<SongSearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [usedFallback, setUsedFallback] = useState(false)
-  const [searchMode, setSearchMode] = useState<SearchMode | 'mock' | null>(null)
-  const [youtubeSearchSucceeded, setYoutubeSearchSucceeded] = useState(false)
+type SearchState = SearchKaraokeResult & {
+  requestKey: string
+  isSearching: boolean
+  error: string | null
+}
 
+const EMPTY_SEARCH: SearchState = {
+  requestKey: '',
+  results: [],
+  isSearching: false,
+  error: null,
+  usedFallback: false,
+  searchMode: 'catalog',
+  youtubeSearchSucceeded: false,
+}
+
+export function useYouTubeSearch(query: string, source: SearchSource = 'auto') {
+  const [state, setState] = useState<SearchState>(EMPTY_SEARCH)
   const trimmed = query.trim().replace(/\s+/g, ' ')
+  const requestKey = JSON.stringify([source, trimmed])
+  const tooShort = trimmed.length === 1
 
   useEffect(() => {
-    if (trimmed.length < 2) {
-      setResults([])
-      setIsSearching(false)
-      setError(null)
-      setUsedFallback(false)
-      setSearchMode(null)
-      setYoutubeSearchSucceeded(false)
+    if (tooShort) {
+      setState(EMPTY_SEARCH)
       return
     }
-
     let cancelled = false
-    setIsSearching(true)
-    setError(null)
-
+    setState({ ...EMPTY_SEARCH, requestKey, isSearching: true })
     const timer = window.setTimeout(() => {
-      void searchKaraokeVideos(trimmed)
+      void searchKaraokeVideos(trimmed, source)
         .then((response) => {
-          if (cancelled) return
-          setResults(response.results)
-          setUsedFallback(response.usedFallback)
-          setSearchMode(response.searchMode)
-          setYoutubeSearchSucceeded(response.youtubeSearchSucceeded)
+          if (!cancelled) {
+            setState({
+              ...response,
+              requestKey,
+              isSearching: false,
+              error: null,
+            })
+          }
         })
-        .catch((err: unknown) => {
-          if (cancelled) return
-          setResults([])
-          setUsedFallback(false)
-          setSearchMode(null)
-          setYoutubeSearchSucceeded(false)
-          setError(err instanceof Error ? err.message : 'Search failed')
-        })
-        .finally(() => {
-          if (!cancelled) setIsSearching(false)
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            setState({
+              ...EMPTY_SEARCH,
+              requestKey,
+              error: error instanceof Error ? error.message : 'Search failed',
+            })
+          }
         })
     }, DEBOUNCE_MS)
-
     return () => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [trimmed])
+  }, [trimmed, source, requestKey, tooShort])
 
-  return {
-    results,
-    isSearching,
-    error,
-    usedFallback,
-    searchMode,
-    youtubeSearchSucceeded,
+  // Do not leave old-source results clickable during a source or query change.
+  if (tooShort) return EMPTY_SEARCH
+  if (state.requestKey !== requestKey) {
+    return { ...EMPTY_SEARCH, requestKey, isSearching: true }
   }
+  return state
 }
