@@ -1,5 +1,6 @@
 import { getFirestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions'
+import { HttpsError } from 'firebase-functions/v2/https'
 
 import {
   buildSearchTokens,
@@ -37,19 +38,23 @@ export async function searchCatalog(
   const queryTokens = buildSearchTokens(normalized)
   const primary = pickPrimarySearchToken(queryTokens)
 
-  if (!primary) return []
+  const browsing = !rawQuery.trim()
+  if (!primary && !browsing) return []
 
   const db = getFirestore()
   let snapshot
   try {
-    snapshot = await db
-      .collection('songs')
-      .where('searchTokens', 'array-contains', primary)
-      .limit(CANDIDATE_LIMIT)
-      .get()
+    const songs = db.collection('songs')
+    const query = browsing
+      ? songs.orderBy('usageCount', 'desc')
+      : songs.where('searchTokens', 'array-contains', primary)
+    snapshot = await query.limit(CANDIDATE_LIMIT).get()
   } catch (error) {
     logger.error('Catalog search query failed', error)
-    return []
+    throw new HttpsError(
+      'unavailable',
+      'Barkadaoke Library is temporarily unavailable. Please try again.',
+    )
   }
 
   const scored: Array<{ score: number; result: SongSearchResult }> = []
@@ -71,13 +76,18 @@ export async function searchCatalog(
 
     // All query tokens should appear in the title tokens when possible.
     const matched = queryTokens.filter((token) => docTokens.includes(token))
-    if (matched.length === 0) continue
+    if (!browsing && matched.length === 0) continue
     // Require at least half the query tokens for multi-token queries.
-    if (queryTokens.length >= 2 && matched.length < Math.ceil(queryTokens.length / 2)) {
+    if (
+      queryTokens.length >= 2 &&
+      matched.length < Math.ceil(queryTokens.length / 2)
+    ) {
       continue
     }
 
-    const coverage = matched.length / queryTokens.length
+    const coverage = queryTokens.length
+      ? matched.length / queryTokens.length
+      : 0
     const prefixBonus = normalizedTitle.startsWith(normalized) ? 2 : 0
     const includesBonus = normalizedTitle.includes(normalized) ? 1 : 0
     const usage = Number(data.usageCount ?? 0)
@@ -85,7 +95,7 @@ export async function searchCatalog(
 
     // Relevance dominates; popularity is a tie-breaker only.
     const score =
-      coverage * 100 +
+      (browsing ? usage : coverage * 100) +
       prefixBonus * 20 +
       includesBonus * 10 +
       Math.min(usage, 50) * 0.1 +
@@ -105,7 +115,7 @@ export async function searchCatalog(
   }
 
   scored.sort((a, b) => b.score - a.score)
-  return scored.slice(0, Math.max(limit, LOCAL_RESULT_THRESHOLD)).map((s) => s.result)
+  return scored.slice(0, limit).map((s) => s.result)
 }
 
 function timestampToMillis(value: unknown): number {

@@ -3,18 +3,25 @@ import { httpsCallable } from 'firebase/functions'
 import { getFirebaseAuth, getFirebaseFunctions } from '@/firebase/config'
 import { createRequestCache } from '@/lib/request-cache'
 import { MOCK_SEARCH_RESULTS } from '@/lib/mock-data'
-import type { SearchMode, SongSearchResult } from '@/types/youtube'
+import type {
+  SearchFallbackReason,
+  SearchMode,
+  SearchSource,
+  SongSearchResult,
+} from '@/types/youtube'
 
 type SearchVideosResponse = {
   results: SongSearchResult[]
   searchMode: SearchMode
   youtubeSearchSucceeded: boolean
+  fallbackReason?: SearchFallbackReason
 }
 
 export type SearchKaraokeResult = {
   results: SongSearchResult[]
   searchMode: SearchMode | 'mock'
   youtubeSearchSucceeded: boolean
+  fallbackReason?: SearchFallbackReason
   /** True only for local-dev mock results when the callable is undeployed. */
   usedFallback: boolean
 }
@@ -31,26 +38,32 @@ const searchRequests = createRequestCache({ ttlMs: 60_000 })
 
 export async function searchKaraokeVideos(
   query: string,
+  source: SearchSource = 'auto',
 ): Promise<SearchKaraokeResult> {
   const normalized = query.trim().replace(/\s+/g, ' ')
   const uid = getFirebaseAuth().currentUser?.uid ?? 'anonymous'
-  return searchRequests(`${uid}:${normalized.toLowerCase()}`, () =>
-    fetchKaraokeVideos(normalized),
+  return searchRequests(
+    JSON.stringify([uid, source, normalized.toLowerCase()]),
+    () => fetchKaraokeVideos(normalized, source),
   )
 }
 
-async function fetchKaraokeVideos(query: string): Promise<SearchKaraokeResult> {
-  const callable = httpsCallable<{ query: string }, SearchVideosResponse>(
-    getFirebaseFunctions(),
-    'searchVideos',
-  )
+async function fetchKaraokeVideos(
+  query: string,
+  source: SearchSource,
+): Promise<SearchKaraokeResult> {
+  const callable = httpsCallable<
+    { query: string; source: SearchSource },
+    SearchVideosResponse
+  >(getFirebaseFunctions(), 'searchVideos')
 
   try {
-    const result = await callable({ query })
+    const result = await callable({ query, source })
     return {
       results: withSearchDefaults(result.data.results ?? []),
       searchMode: result.data.searchMode ?? 'catalog+youtube',
       youtubeSearchSucceeded: Boolean(result.data.youtubeSearchSucceeded),
+      fallbackReason: result.data.fallbackReason,
       usedFallback: false,
     }
   } catch (error) {
@@ -62,9 +75,9 @@ async function fetchKaraokeVideos(query: string): Promise<SearchKaraokeResult> {
     // Dev-only: allow UI work before the Cloud Function is deployed.
     // Production YouTube failures are handled server-side as catalog-fallback.
     if (
-      code.includes('not-found') ||
-      code.includes('unimplemented') ||
-      code.includes('failed-precondition')
+      import.meta.env.DEV &&
+      source !== 'catalog' &&
+      (code.includes('not-found') || code.includes('unimplemented'))
     ) {
       return {
         results: withSearchDefaults(MOCK_SEARCH_RESULTS),

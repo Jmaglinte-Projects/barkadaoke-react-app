@@ -26,12 +26,24 @@ export type SongSearchResult = {
   resultSource: 'catalog' | 'youtube'
 }
 
-export type SearchMode = 'catalog' | 'catalog+youtube' | 'catalog-fallback'
+export type SearchSource = 'auto' | 'catalog' | 'youtube'
+
+export type SearchFallbackReason =
+  | 'quota-exceeded'
+  | 'youtube-unavailable'
+  | 'not-configured'
+
+export type SearchMode =
+  | 'catalog'
+  | 'catalog+youtube'
+  | 'catalog-fallback'
+  | 'youtube'
 
 export type SearchVideosResponse = {
   results: SongSearchResult[]
   searchMode: SearchMode
   youtubeSearchSucceeded: boolean
+  fallbackReason?: SearchFallbackReason
 }
 
 export type CatalogSongInput = {
